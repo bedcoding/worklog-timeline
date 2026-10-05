@@ -1,0 +1,30 @@
+{
+  "id": "sample05",
+  "date": "2026-08-06",
+  "title": "가벼운 데이터 정리 스크립트",
+  "type": "dev",
+  "description": "샘플 데이터의 형식을 정리하는 스크립트 초안을 작성하고 직접 검증했어요.",
+  "effect": "수동으로 바꾸던 형식을 일관되게 정리할 수 있어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample05a",
+      "label": "실행 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample05b",
+      "label": "코드 검토",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000004,
+  "updatedAt": 1791072000004
+}

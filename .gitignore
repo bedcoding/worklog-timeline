@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# 기록과 증빙 캡처(사내 화면)가 들어 있는 데이터 폴더. 저장소에 올리지 않습니다.
+data/

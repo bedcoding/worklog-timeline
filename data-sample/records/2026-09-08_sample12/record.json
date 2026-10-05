@@ -1,0 +1,30 @@
+{
+  "id": "sample12",
+  "date": "2026-09-08",
+  "title": "흩어진 의견을 검토 메모로",
+  "type": "doc",
+  "description": "가상의 의견 메모를 주제별로 묶고 다음에 확인할 내용을 정리했어요.",
+  "effect": "담당자가 확인할 항목을 빠르게 찾을 수 있어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample12a",
+      "label": "결과 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample12b",
+      "label": "검토 화면",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000011,
+  "updatedAt": 1791072000011
+}

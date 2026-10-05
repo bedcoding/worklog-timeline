@@ -1,0 +1,30 @@
+{
+  "id": "sample10",
+  "date": "2026-09-24",
+  "title": "공유하기 쉬운 작업 가이드",
+  "type": "doc",
+  "description": "도구 사용 순서와 확인 항목을 짧은 가이드로 정리했어요.",
+  "effect": "작업 맥락과 주의할 점을 함께 전달할 수 있어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": true,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample10a",
+      "label": "초안",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample10b",
+      "label": "검토본",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000009,
+  "updatedAt": 1791072000009
+}

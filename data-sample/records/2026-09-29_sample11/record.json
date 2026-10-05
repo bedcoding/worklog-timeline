@@ -1,0 +1,30 @@
+{
+  "id": "sample11",
+  "date": "2026-09-29",
+  "title": "선택한 방향으로 시안 다듬기",
+  "type": "design",
+  "description": "가상 시안의 색상과 간격을 조정하고 최종 결과를 정리했어요.",
+  "effect": "사람이 선택한 방향에 맞춰 결과물을 다듬었어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample11a",
+      "label": "시안 보드",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample11b",
+      "label": "다른 시안",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000010,
+  "updatedAt": 1791072000010
+}

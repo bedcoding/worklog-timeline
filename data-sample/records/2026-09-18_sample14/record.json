@@ -1,0 +1,30 @@
+{
+  "id": "sample14",
+  "date": "2026-09-18",
+  "title": "작은 도구의 사용 순서 정리",
+  "type": "doc",
+  "description": "샘플 도구를 처음 사용하는 사람도 따라할 수 있도록 순서를 적었어요.",
+  "effect": "사용 순서와 주의할 점을 함께 전달할 수 있어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample14a",
+      "label": "결과 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample14b",
+      "label": "검토 화면",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000013,
+  "updatedAt": 1791072000013
+}

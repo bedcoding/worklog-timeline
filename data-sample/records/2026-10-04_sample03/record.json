@@ -1,0 +1,30 @@
+{
+  "id": "sample03",
+  "date": "2026-10-04",
+  "title": "아이디어를 빠르게 비교하는 시안 보드",
+  "type": "design",
+  "description": "색과 구성을 달리한 시안을 만든 뒤 한 화면에서 비교했어요. 최종 방향은 담당자가 골라 수정하는 흐름입니다.",
+  "effect": "초기 방향을 이미지로 비교할 수 있어 설명하기 쉬워졌어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample03a",
+      "label": "시안 보드",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample03b",
+      "label": "다른 시안",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000002,
+  "updatedAt": 1791072000002
+}

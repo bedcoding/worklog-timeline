@@ -1,0 +1,30 @@
+{
+  "id": "sample17",
+  "date": "2026-10-02",
+  "title": "미리보기 화면에 동작 연결",
+  "type": "dev",
+  "description": "샘플 화면에서 목록 선택과 결과 표시를 연결하고 동작을 확인했어요.",
+  "effect": "화면 흐름을 직접 눌러보며 검토할 수 있어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample17a",
+      "label": "결과 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample17b",
+      "label": "검토 화면",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000016,
+  "updatedAt": 1791072000016
+}

@@ -1,0 +1,30 @@
+{
+  "id": "sample13",
+  "date": "2026-09-15",
+  "title": "제안 내용을 한 장의 시안으로",
+  "type": "design",
+  "description": "설명으로만 남아 있던 아이디어를 간단한 시각 자료로 구성했어요.",
+  "effect": "대안을 비교할 수 있는 출발점을 만들었어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample13a",
+      "label": "결과 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample13b",
+      "label": "검토 화면",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000012,
+  "updatedAt": 1791072000012
+}

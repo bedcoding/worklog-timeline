@@ -1,0 +1,30 @@
+{
+  "id": "sample16",
+  "date": "2026-09-26",
+  "title": "선택한 시안의 간격과 색상 다듬기",
+  "type": "design",
+  "description": "가상의 시안에서 간격과 색상을 정리하고 여러 크기로 확인했어요.",
+  "effect": "선택한 방향을 일관된 결과물로 정리했어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample16a",
+      "label": "결과 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample16b",
+      "label": "검토 화면",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000015,
+  "updatedAt": 1791072000015
+}

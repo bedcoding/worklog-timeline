@@ -1,0 +1,30 @@
+{
+  "id": "sample01",
+  "date": "2026-10-01",
+  "title": "반복 작업을 줄이는 작은 자동화 도구",
+  "type": "dev",
+  "description": "파일 이름을 바꾸고 폴더별로 나누던 작업을 한 화면에 모았어요. 초안을 빠르게 만들고, 실제 사용 흐름에 맞게 다듬었습니다.",
+  "effect": "반복 입력 없이 파일을 정리할 수 있게 됐어요. 예외 파일은 직접 확인합니다.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": true,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample01a",
+      "label": "실행 화면",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample01b",
+      "label": "코드 검토",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000000,
+  "updatedAt": 1791072000000
+}

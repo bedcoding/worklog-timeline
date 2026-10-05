@@ -1,0 +1,30 @@
+{
+  "id": "sample08",
+  "date": "2026-09-12",
+  "title": "색과 구성을 비교하는 실험",
+  "type": "design",
+  "description": "서로 다른 색과 레이아웃을 가상의 시안 보드에 모아 비교했어요.",
+  "effect": "검토할 방향을 구체적으로 표현할 수 있어요.",
+  "toolIds": [
+    "claude-team-premium"
+  ],
+  "featured": false,
+  "limitHit": false,
+  "sample": true,
+  "images": [
+    {
+      "id": "sample08a",
+      "label": "시안 보드",
+      "name": "sample-result.svg",
+      "file": "1.svg"
+    },
+    {
+      "id": "sample08b",
+      "label": "다른 시안",
+      "name": "sample-review.svg",
+      "file": "2.svg"
+    }
+  ],
+  "createdAt": 1791072000007,
+  "updatedAt": 1791072000007
+}
