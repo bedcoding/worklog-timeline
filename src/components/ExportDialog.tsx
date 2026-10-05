@@ -3,8 +3,9 @@ import { api } from '../lib/api';
 import { downloadBlob } from '../lib/download';
 import type { Png } from '../lib/images';
 import { normalizeSettings } from '../lib/normalize';
-import { buildReport, FEATURED_LIMIT, reportFileName } from '../lib/report';
-import type { ImageEntry, Settings, WorkRecord } from '../lib/types';
+import { shortDate } from '../lib/dates';
+import { buildReport, byDate, REPORT_FIELDS, reportFileName } from '../lib/report';
+import type { ImageEntry, ReportField, Settings, WorkRecord } from '../lib/types';
 import { isOffline } from '../lib/util';
 import { IconCheck, IconClose } from './Icons';
 import { Modal } from './Modal';
@@ -36,6 +37,8 @@ interface ExportDialogProps {
   /** 왼쪽 칸에서 고친 부서, 작성자, 보고 분기를 설정 파일에 저장합니다 */
   onSaveSettings: (settings: Settings) => Promise<void>;
   onOpenSettings: () => void;
+  /** 창 안의 기록 목록에서 체크를 바꾸면 주간 기록의 체크도 같이 바꿉니다 */
+  onCheckRecords: (ids: string[], checked: boolean) => void;
 }
 
 export function ExportDialog(props: ExportDialogProps) {
@@ -46,53 +49,93 @@ export function ExportDialog(props: ExportDialogProps) {
   );
 }
 
-/** 왼쪽 칸에서 고치는 값. 양식 첫 칸(부서, 작성자, 보고 분기)입니다. */
-interface HeaderDraft {
+/** 왼쪽 칸에서 고치는 값. 양식 첫 칸(부서, 작성자, 보고 분기)과 나머지 다섯 칸입니다. */
+interface ReportDraft {
   team: string;
   author: string;
   period: string;
+  /** 손으로 고친 칸만 들어 있습니다. 없는 칸은 기록으로 채운 내용을 그대로 씁니다. */
+  fields: Partial<Record<ReportField, string>>;
 }
 
-/** 고친 값을 설정에 얹습니다. 보고 분기를 비우거나 기록 날짜로 정한 값과 같게 쓰면 고친 값을 지웁니다. */
-function applyDraft(settings: Settings, draft: HeaderDraft, autoPeriod: string): Settings {
+/**
+ * 고친 값을 설정에 얹습니다. 보고 분기와 다섯 칸은 기록 날짜로 정한 기간 글(autoPeriod)을 열쇠로 저장하고,
+ * 비우거나 기록으로 채운 내용(autoText)과 같게 쓰면 고친 값을 지웁니다.
+ */
+function applyDraft(settings: Settings, draft: ReportDraft, autoPeriod: string, autoText: Record<ReportField, string>): Settings {
   const periods = { ...settings.periods };
   const period = draft.period.trim();
   if (!period || period === autoPeriod) delete periods[autoPeriod];
   else periods[autoPeriod] = period;
-  return normalizeSettings({ ...settings, team: draft.team.trim(), author: draft.author.trim(), periods });
+  const fields: Partial<Record<ReportField, string>> = {};
+  for (const { key } of REPORT_FIELDS) {
+    const text = draft.fields[key]?.trim();
+    if (text && text !== autoText[key].trim()) fields[key] = text;
+  }
+  const reportEdits = { ...settings.reportEdits };
+  if (Object.keys(fields).length) reportEdits[autoPeriod] = fields;
+  else delete reportEdits[autoPeriod];
+  return normalizeSettings({
+    ...settings,
+    team: draft.team.trim(),
+    author: draft.author.trim(),
+    periods,
+    reportEdits,
+  });
 }
 
 const sameSettings = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
 
+/** 다 만든 문서가 지금 고른 값으로 만든 것인지 가리는 열쇠. 설정 값(JSON)과 첫 쪽을 넣었는지로 정합니다. */
+const docKeyOf = (settingsKey: string, withForm: boolean) => `${withForm ? 'report' : 'records'}:${settingsKey}`;
+
 /** 받을 Word 파일을 만들어 그대로 보여 주고, Word 나 PDF 로 받게 합니다. PDF 도 보여 준 그 문서를 인쇄해 만듭니다. */
-function ExportBody({ records, settings, images, today, onClose, onSaveSettings, onOpenSettings }: ExportDialogProps) {
+function ExportBody({ records, settings, images, today, onClose, onSaveSettings, onOpenSettings, onCheckRecords }: ExportDialogProps) {
   const id = useId();
   // preview 는 화면에 그린 마지막 문서, ready 는 다 만든 문서와 그때 쓴 값(key)입니다
   const [preview, setPreview] = useState<Blob | null>(null);
   const [ready, setReady] = useState<{ blob: Blob; key: string } | null>(null);
   // 새 문서를 만드는 중에 받기를 누르면, 다 만들어지는 대로 받습니다(단추를 껐다 켰다 하지 않습니다)
   const [pending, setPending] = useState<FileKind | null>(null);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState('');
   const [saveError, setSaveError] = useState('');
   // 방금 받은 파일 종류. 잠깐 그 단추를 "받았어요"로 바꿉니다.
   const [done, setDone] = useState<FileKind | null>(null);
   // PDF 는 저장 서버가 브라우저로 인쇄해 만들어서 몇 초 걸립니다
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [pdfMessage, setPdfMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [pdfMessage, setPdfMessage] = useState<{
+    text: string;
+    error: boolean;
+  } | null>(null);
   // 내용을 고쳐 다시 만들 때 이미지를 또 바꾸지 않도록 창이 열려 있는 동안 PNG 를 모아 둡니다
   const pngs = useRef(new Map<string, Promise<Png>>());
+  // 첫 쪽 보고서 본문(팀장이 결재에 올리는 양식 칸)을 뺄지. 포트폴리오나 결과물만 낼 때 씁니다. 창을 열 때마다 넣는 쪽으로 시작합니다.
+  const [skipForm, setSkipForm] = useState(false);
+  // 창을 열 때 체크돼 있던 기록. 창 안에서 체크를 풀어도 목록에 남겨 두어 다시 넣을 수 있게 합니다.
+  const [listed] = useState(() => [...records].sort(byDate));
+  const included = useMemo(() => new Set(records.map((r) => r.id)), [records]);
 
   // 보고 분기는 기록 날짜로 정하고, 고쳐 쓴 값은 그 기간 글을 열쇠로 저장합니다
   const base = useMemo(() => buildReport(records, settings), [records, settings]);
   const auto = base.autoPeriodText;
+  const autoText = base.autoText;
   // draft 는 칸에 보이는 값, committed 는 손을 멈춘 뒤 문서와 설정에 반영한 값입니다
-  const [draft, setDraft] = useState<HeaderDraft>(() => ({ team: settings.team, author: settings.author, period: base.periodText }));
-  const [committed, setCommitted] = useState<HeaderDraft>(draft);
-  const effectiveKey = JSON.stringify(applyDraft(settings, committed, auto));
+  const [draft, setDraft] = useState<ReportDraft>(() => ({
+    team: settings.team,
+    author: settings.author,
+    period: base.periodText,
+    fields: { ...settings.reportEdits?.[base.autoPeriodText] },
+  }));
+  const [committed, setCommitted] = useState<ReportDraft>(draft);
+  const effectiveKey = JSON.stringify(applyDraft(settings, committed, auto, autoText));
   const effective = useMemo(() => JSON.parse(effectiveKey) as Settings, [effectiveKey]);
+  const docKey = docKeyOf(effectiveKey, !skipForm);
   const report = useMemo(() => buildReport(records, effective), [records, effective]);
-  const fileName = reportFileName(report, effective);
+  const fileName = reportFileName(report, effective, !skipForm);
   const pdfName = fileName.replace(/\.docx$/i, '.pdf');
   const imageCount = records.reduce((n, r) => n + r.images.length, 0);
   const periodEdited = !!draft.period.trim() && draft.period.trim() !== auto;
@@ -103,17 +146,27 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
     return () => window.clearTimeout(timer);
   }, [draft, committed]);
 
-  // 돌아온 설정이 내가 보낸 것인지 설정 창에서 바꾼 것인지 가리려고, 마지막으로 보낸 값과 저장 중인 횟수를 기억합니다
-  const latest = useRef({ settings, auto, draft });
+  // 기록을 빼거나 다시 넣어 보고 기간이 바뀌면(여러 분기에 걸친 기록일 때), 그 기간에 고쳐 둔 보고 분기와 다섯 칸을 불러옵니다
+  const draftAuto = useRef(auto);
   useEffect(() => {
-    latest.current = { settings, auto, draft };
+    if (draftAuto.current === auto) return;
+    draftAuto.current = auto;
+    const sync = (d: ReportDraft) => ({ ...d, period: base.periodText, fields: { ...settings.reportEdits?.[auto] } });
+    setDraft(sync);
+    setCommitted(sync);
+  }, [auto, base.periodText, settings.reportEdits]);
+
+  // 돌아온 설정이 내가 보낸 것인지 설정 창에서 바꾼 것인지 가리려고, 마지막으로 보낸 값과 저장 중인 횟수를 기억합니다
+  const latest = useRef({ settings, auto, autoText, draft });
+  useEffect(() => {
+    latest.current = { settings, auto, autoText, draft };
   });
   const sent = useRef({ team: settings.team, author: settings.author });
   const saving = useRef(0);
   const save = useCallback(
-    (value: HeaderDraft) => {
-      const { settings: current, auto: key } = latest.current;
-      const next = applyDraft(current, value, key);
+    (value: ReportDraft) => {
+      const { settings: current, auto: key, autoText: filled } = latest.current;
+      const next = applyDraft(current, value, key, filled);
       if (sameSettings(next, current)) return;
       sent.current = { team: next.team, author: next.author };
       saving.current += 1;
@@ -134,7 +187,11 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
     if (saving.current > 0) return;
     if (settings.team === sent.current.team && settings.author === sent.current.author) return;
     sent.current = { team: settings.team, author: settings.author };
-    const sync = (d: HeaderDraft) => ({ ...d, team: settings.team, author: settings.author });
+    const sync = (d: ReportDraft) => ({
+      ...d,
+      team: settings.team,
+      author: settings.author,
+    });
     setDraft(sync);
     setCommitted(sync);
   }, [settings.team, settings.author]);
@@ -166,6 +223,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
         };
         const blob = await buildDocxExport(records, effective, images, {
           generatedOn: today,
+          includeForm: !skipForm,
           toPng,
           signal,
           onProgress: (done, total) => {
@@ -173,7 +231,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
           },
         });
         if (signal.aborted) return;
-        setReady({ blob, key: effectiveKey });
+        setReady({ blob, key: docKey });
         setPreview(blob);
         setProgress(null);
       } catch (err) {
@@ -186,7 +244,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [records, effective, effectiveKey, images, today]);
+  }, [records, effective, skipForm, docKey, images, today]);
 
   useEffect(() => {
     if (!done) return;
@@ -222,11 +280,18 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
           setDone('pdf');
         } else {
           await printHtml(html);
-          if (alive.current) setPdfMessage({ text: '이 PC에서는 PDF를 바로 만들 수 없어 인쇄 창을 열었어요. 대상에서 "PDF로 저장"을 고르세요.', error: false });
+          if (alive.current)
+            setPdfMessage({
+              text: '이 PC에서는 PDF를 바로 만들 수 없어 인쇄 창을 열었어요. 대상에서 "PDF로 저장"을 고르세요.',
+              error: false,
+            });
         }
       } catch (err) {
         if (!alive.current) return;
-        setPdfMessage({ text: isOffline(err) ? OFFLINE : err instanceof Error ? err.message : 'PDF를 만들지 못했어요.', error: true });
+        setPdfMessage({
+          text: isOffline(err) ? OFFLINE : err instanceof Error ? err.message : 'PDF를 만들지 못했어요.',
+          error: true,
+        });
       } finally {
         if (alive.current) setPdfBusy(false);
       }
@@ -235,17 +300,17 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   );
 
   useEffect(() => {
-    if (!pending || !ready || ready.key !== effectiveKey) return;
+    if (!pending || !ready || ready.key !== docKey) return;
     setPending(null);
     void deliver(pending, ready.blob);
-  }, [pending, ready, effectiveKey, deliver]);
+  }, [pending, ready, docKey, deliver]);
   useEffect(() => {
     if (error) setPending(null);
   }, [error]);
 
   // 받기를 누른 순간 칸에 보이는 값으로 만든 문서만 받습니다. 아직이면 바로 반영하고 다 만들어지면 받습니다.
   const download = (kind: FileKind) => {
-    const wanted = JSON.stringify(applyDraft(settings, draft, auto));
+    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm);
     if (ready && ready.key === wanted) {
       void deliver(kind, ready.blob);
       return;
@@ -254,7 +319,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
     setPending(kind);
   };
 
-  const edit = (field: keyof HeaderDraft) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const edit = (field: 'team' | 'author' | 'period') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setDraft((d) => ({ ...d, [field]: value }));
   };
@@ -264,6 +329,34 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
     const next = { ...draft, period: auto };
     setDraft(next);
     setCommitted(next);
+  };
+
+  // 다섯 칸: 고치지 않은 칸은 기록으로 채운 내용을 보여 줍니다
+  const fieldText = (key: ReportField) => draft.fields[key] ?? report.autoText[key];
+  const fieldEdited = (key: ReportField) => {
+    const text = draft.fields[key]?.trim();
+    return !!text && text !== report.autoText[key].trim();
+  };
+  const editField = (key: ReportField) => (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }));
+  };
+  const resetField = (key: ReportField) => {
+    const fields = { ...draft.fields };
+    delete fields[key];
+    const next = { ...draft, fields };
+    setDraft(next);
+    setCommitted(next);
+  };
+  // 창 안에서 체크를 푼 기록을 모두 다시 넣습니다
+  const includeAll = () => {
+    const ids = listed.map((r) => r.id);
+    onCheckRecords(ids, true);
+  };
+  // 칸을 다 지우고 나가면 기록으로 채운 내용으로 돌아갑니다
+  const leaveField = (key: ReportField) => {
+    if (draft.fields[key]?.trim()) commitNow();
+    else resetField(key);
   };
 
   return (
@@ -276,60 +369,98 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
       </div>
       <div className="export-layout">
         <div className="export-side">
-          <div className="field">
-            <label htmlFor={`${id}-team`}>부서</label>
-            <input id={`${id}-team`} value={draft.team} placeholder="예: 기획팀" onChange={edit('team')} onBlur={commitNow} />
-          </div>
-          <div className="field">
-            <label htmlFor={`${id}-author`}>작성자</label>
-            <input id={`${id}-author`} value={draft.author} placeholder="예: 홍길동" onChange={edit('author')} onBlur={commitNow} />
-          </div>
-          <div className="field">
-            <div className="field-head">
-              <label htmlFor={`${id}-period`}>보고 분기</label>
-              {periodEdited && (
-                <button type="button" className="text-button" onClick={resetPeriod}>
-                  되돌리기
+          <div className="export-form">
+            <dl className="export-summary">
+              <div>
+                <dt>체크한 기록</dt>
+                <dd>{records.length}개</dd>
+              </div>
+              <div>
+                <dt>증빙 이미지</dt>
+                <dd>{imageCount}장</dd>
+              </div>
+            </dl>
+            <label className="check-line export-option">
+              <input type="checkbox" checked={skipForm} onChange={(e) => setSkipForm(e.target.checked)} />
+              1쪽 보고서 본문 빼기
+            </label>
+            {!skipForm && !settings.tools.length && (
+              <p className="export-callout">
+                사용 도구가 비어 있어요.{' '}
+                <button type="button" className="text-button inline" onClick={onOpenSettings}>
+                  설정에서 채우기
                 </button>
-              )}
+              </p>
+            )}
+            <div className="field">
+              <label htmlFor={`${id}-team`}>부서</label>
+              <input id={`${id}-team`} value={draft.team} placeholder="예: 기획팀" onChange={edit('team')} onBlur={commitNow} />
             </div>
-            <input id={`${id}-period`} value={draft.period} placeholder={auto} onChange={edit('period')} onBlur={commitNow} />
+            {!skipForm && (
+              <div className="field">
+                <label htmlFor={`${id}-author`}>작성자</label>
+                <input id={`${id}-author`} value={draft.author} placeholder="예: 홍길동" onChange={edit('author')} onBlur={commitNow} />
+              </div>
+            )}
+            <div className="field">
+              <div className="field-head">
+                <label htmlFor={`${id}-period`}>보고 분기</label>
+                {periodEdited && (
+                  <button type="button" className="text-button" onClick={resetPeriod}>
+                    되돌리기
+                  </button>
+                )}
+              </div>
+              <input id={`${id}-period`} value={draft.period} placeholder={auto} onChange={edit('period')} onBlur={commitNow} />
+            </div>
+            {/* 다섯 칸은 첫 쪽 표에만 들어가므로, 첫 쪽을 빼면 숨깁니다. 고친 내용은 그대로 남아 있습니다. */}
+            {!skipForm &&
+              REPORT_FIELDS.map(({ key, label }) => (
+                <div className="field" key={key}>
+                  <div className="field-head">
+                    <label htmlFor={`${id}-${key}`}>{label}</label>
+                    {fieldEdited(key) && (
+                      <button type="button" className="text-button" onClick={() => resetField(key)}>
+                        되돌리기
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    id={`${id}-${key}`}
+                    className="export-textarea"
+                    value={fieldText(key)}
+                    spellCheck={false}
+                    onChange={editField(key)}
+                    onBlur={() => leaveField(key)}
+                  />
+                </div>
+              ))}
+            <div className="export-pick">
+              <div className="field-head">
+                <span id={`${id}-records`}>넣을 기록</span>
+                {listed.length > records.length && (
+                  <button type="button" className="text-button" onClick={includeAll}>
+                    모두 넣기
+                  </button>
+                )}
+              </div>
+              <ul className="export-records" role="group" aria-labelledby={`${id}-records`}>
+                {listed.map((r) => (
+                  <li key={r.id}>
+                    <label className={`check-line${included.has(r.id) ? '' : ' is-off'}`} title={r.title}>
+                      <input type="checkbox" checked={included.has(r.id)} onChange={(e) => onCheckRecords([r.id], e.target.checked)} />
+                      <span className="export-record-date">{shortDate(r.date)}</span>
+                      <span className="export-record-title">{r.title}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <dl className="export-summary">
-            <div>
-              <dt>체크한 기록</dt>
-              <dd>{records.length}개</dd>
-            </div>
-            <div>
-              <dt>증빙 이미지</dt>
-              <dd>{imageCount}장</dd>
-            </div>
-            <div>
-              <dt>대표 결과물</dt>
-              <dd>{report.featured.length}건</dd>
-            </div>
-          </dl>
-          {!settings.tools.length && (
-            <p className="export-callout">
-              사용 도구가 비어 있어요.{' '}
-              <button type="button" className="text-button inline" onClick={onOpenSettings}>
-                설정에서 채우기
-              </button>
-            </p>
-          )}
-          {records.length > 0 && report.featured.length === 0 && <p className="export-callout">대표 결과물이 없어 첨부 칸이 비어요.</p>}
-          {report.featured.length > FEATURED_LIMIT && (
-            <p className="export-callout warn">
-              대표 결과물이 {report.featured.length}건이에요. 양식은 1~2건이에요.
-            </p>
-          )}
           <div className="export-actions">
             {saveError && <p className="export-error">{saveError}</p>}
             {pdfMessage && <p className={pdfMessage.error ? 'export-error' : 'export-note'}>{pdfMessage.text}</p>}
-            <div className="form-actions">
-              <button type="button" className="btn" onClick={onClose}>
-                닫기
-              </button>
+            <div className="export-buttons">
               <button
                 type="button"
                 className={`btn download-button${done === 'pdf' ? ' is-done' : ''}${pending === 'pdf' || pdfBusy ? ' is-waiting' : ''}`}
@@ -453,7 +584,13 @@ function DocxView({ blob, progress, error = '', empty = '' }: DocxViewProps) {
     const next = document.createElement('div');
     // 문서를 그리는 라이브러리도 커서 필요할 때만 불러옵니다
     import('docx-preview')
-      .then(({ renderAsync }) => renderAsync(blob, next, undefined, { className: PREFIX, inWrapper: true, breakPages: true }))
+      .then(({ renderAsync }) =>
+        renderAsync(blob, next, undefined, {
+          className: PREFIX,
+          inWrapper: true,
+          breakPages: true,
+        }),
+      )
       .then(() => {
         if (!alive) {
           revokeImages(next);

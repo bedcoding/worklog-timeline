@@ -1,5 +1,5 @@
 import { isValidISO } from './dates.ts';
-import type { ImageRef, Settings, Tool, WorkRecord } from './types.ts';
+import type { ImageRef, ReportField, Settings, Tool, WorkRecord } from './types.ts';
 import { isWorkType } from './workTypes.ts';
 
 /*
@@ -12,6 +12,9 @@ import { isWorkType } from './workTypes.ts';
 export const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 /** 데이터 폴더 안 이미지 파일 이름: 1.png, 2.jpg ... */
 export const SAFE_IMAGE_FILE = /^\d{1,6}\.(png|jpg|webp|gif|svg)$/;
+
+/** 보고서에서 고쳐 쓸 수 있는 칸 */
+const REPORT_FIELD_KEYS: ReportField[] = ['tools', 'outputs', 'effects', 'opinion', 'attachments'];
 
 const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback);
 
@@ -36,8 +39,21 @@ export function normalizeSettings(raw: unknown): Settings {
       if (key.length <= 100 && typeof value === 'string' && value.trim() && value.length <= 200) periods[key] = value;
     }
   }
+  const reportEdits: NonNullable<Settings['reportEdits']> = {};
+  if (s.reportEdits && typeof s.reportEdits === 'object' && !Array.isArray(s.reportEdits)) {
+    for (const [key, value] of Object.entries(s.reportEdits as Record<string, unknown>).slice(-MAX_PERIODS)) {
+      if (key.length > 100 || !value || typeof value !== 'object') continue;
+      const fields: Partial<Record<ReportField, string>> = {};
+      for (const field of REPORT_FIELD_KEYS) {
+        const text = (value as Record<string, unknown>)[field];
+        if (typeof text === 'string' && text.trim() && text.length <= 4000) fields[field] = text;
+      }
+      if (Object.keys(fields).length) reportEdits[key] = fields;
+    }
+  }
   const settings: Settings = { team: str(s.team), author: str(s.author), tools };
   if (Object.keys(periods).length) settings.periods = periods;
+  if (Object.keys(reportEdits).length) settings.reportEdits = reportEdits;
   return settings;
 }
 
@@ -69,7 +85,6 @@ export function normalizeRecord(raw: unknown): WorkRecord | null {
     description: str(r.description),
     effect: str(r.effect),
     toolIds: Array.isArray(r.toolIds) ? r.toolIds.filter((t): t is string => typeof t === 'string') : [],
-    featured: r.featured === true,
     limitHit: r.limitHit === true,
     sample: r.sample === true,
     images,

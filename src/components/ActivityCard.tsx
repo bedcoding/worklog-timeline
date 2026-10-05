@@ -3,7 +3,7 @@ import { monthOf, quarterOfMonth, toDay, yearOf, type DayRange, type Period } fr
 import type { ImageEntry, ViewKind, WorkRecord } from '../lib/types';
 import { WORK_TYPES } from '../lib/workTypes';
 import { DatePicker, QuarterPicker, YearPicker } from './DatePicker';
-import { IconChevronLeft, IconChevronRight, STAR_PATH } from './Icons';
+import { IconChevronLeft, IconChevronRight } from './Icons';
 import { Timeline } from './Timeline';
 
 const VIEWS: { key: ViewKind; label: string }[] = [
@@ -113,12 +113,6 @@ export function ActivityCard(props: ActivityCardProps) {
                 {WORK_TYPES.etc.label}
               </span>
             )}
-            <span>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d={STAR_PATH} />
-              </svg>
-              대표 결과물
-            </span>
             {period.view !== 'year' && (
               <span>
                 <i className="weekend-key" />

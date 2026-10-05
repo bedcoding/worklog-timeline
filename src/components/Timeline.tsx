@@ -4,7 +4,6 @@ import { fromDay, shortDate, toDay, weekdayOfDay, type DayRange } from '../lib/d
 import type { ImageEntry, ViewKind, WorkRecord } from '../lib/types';
 import { clamp } from '../lib/util';
 import { WORK_TYPES } from '../lib/workTypes';
-import { STAR_PATH } from './Icons';
 
 /** 같은 날 기록을 아래로 쌓을 때 한 칸 간격(px) */
 const LANE_GAP = 40;
@@ -231,13 +230,6 @@ export function Timeline({ records, range, view, today, selectedId, images, rese
                 onClick={() => onOpen(record.id)}
               >
                 {lane > 0 && <span className="stem" aria-hidden="true" />}
-                {record.featured && (
-                  <span className="point-star" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d={STAR_PATH} />
-                    </svg>
-                  </span>
-                )}
               </button>
             );
           })}

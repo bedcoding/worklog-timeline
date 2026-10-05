@@ -25,7 +25,6 @@ import {
 } from './lib/dates';
 import { downloadBlob, fileStamp } from './lib/download';
 import { imagesFromClipboard } from './lib/images';
-import { FEATURED_LIMIT, recordsInQuarter } from './lib/report';
 import type { RecordDraft, ViewKind } from './lib/types';
 
 type DetailOrigin = 'timeline' | 'list';
@@ -218,21 +217,6 @@ export default function App() {
     }
   };
 
-  const toggleFeatured = async () => {
-    if (!detailRecord) return;
-    const next = !detailRecord.featured;
-    try {
-      await store.setFeatured(detailRecord.id, next);
-      if (next) {
-        const q = { year: yearOf(detailRecord.date), quarter: quarterOfMonth(monthOf(detailRecord.date)) };
-        const count = recordsInQuarter(records, q.year, q.quarter).filter((r) => r.featured || r.id === detailRecord.id).length;
-        show(count > FEATURED_LIMIT ? `${q.quarter}분기 대표 결과물이 ${count}건이 됐어요. 양식에는 1~2건을 첨부합니다.` : '분기 대표 결과물로 지정했어요.');
-      } else show('대표 결과물에서 뺐어요.');
-    } catch (err) {
-      show(err instanceof Error ? err.message : '바꾸지 못했어요.');
-    }
-  };
-
   const addImagesToSelected = async (files: File[]) => {
     if (!detailRecord) return;
     const before = detailRecord.images.length;
@@ -258,9 +242,6 @@ export default function App() {
     }
   };
 
-  const featuredInQuarter = detailRecord
-    ? recordsInQuarter(records, yearOf(detailRecord.date), quarterOfMonth(monthOf(detailRecord.date))).filter((r) => r.featured).length
-    : 0;
   const detailIndex = visible.findIndex((r) => r.id === selectedId);
 
   if (store.status !== 'ready') {
@@ -410,14 +391,12 @@ export default function App() {
         imageIndex={imageIndex}
         counter={{ index: detailIndex + 1, total: visible.length }}
         checked={!!detailRecord && checked.has(detailRecord.id)}
-        featuredInQuarter={featuredInQuarter}
         onImageIndex={setImageIndex}
         onPrev={() => step(-1)}
         onNext={() => step(1)}
         onClose={closeDetail}
         onEdit={() => detailRecord && setForm({ mode: 'edit', recordId: detailRecord.id })}
         onDelete={deleteSelected}
-        onToggleFeatured={toggleFeatured}
         onToggleCheck={(v) => detailRecord && toggleCheck(detailRecord.id, v)}
         onAddImages={addImagesToSelected}
         onRemoveImage={removeImageFromSelected}
@@ -444,6 +423,7 @@ export default function App() {
         onClose={() => setExportOpen(false)}
         onSaveSettings={store.saveSettings}
         onOpenSettings={() => setSettingsOpen(true)}
+        onCheckRecords={toggleMany}
       />
       <SettingsDialog
         open={settingsOpen}

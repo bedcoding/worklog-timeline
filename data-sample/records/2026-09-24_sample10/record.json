@@ -8,7 +8,6 @@
   "toolIds": [
     "claude-team-premium"
   ],
-  "featured": true,
   "limitHit": false,
   "sample": true,
   "images": [

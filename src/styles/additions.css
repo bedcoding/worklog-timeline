@@ -23,9 +23,6 @@
     0 0 0 3px #d7eeac,
     0 0 0 4px #bfd58e;
 }
-.timeline.is-year .point .point-star {
-  top: -3px;
-}
 .point.is-hover:before {
   transform: scale(1.2);
 }
@@ -412,15 +409,6 @@ dialog:focus {
   background: #f7ece4;
   color: #9a6a4b;
 }
-.detail .star-button + .detail-check,
-.detail .featured-warn + .detail-check {
-  margin-top: 8px;
-}
-.featured-warn {
-  margin: 8px 0 0;
-  font-size: 10px;
-  color: #9a6a4b;
-}
 .attach-actions {
   display: flex;
   align-items: center;
@@ -599,17 +587,32 @@ dialog:focus {
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 24px;
 }
-/* 세로 스크롤 상자는 옆으로 삐져나온 것을 잘라서, 입력 칸 포커스 테두리(칸 밖 7px)가 잘리지 않게 안쪽 여백을 두고
-   같은 만큼 바깥으로 넓혀 줄을 맞춥니다. */
+/* 왼쪽 칸: 입력 칸은 스크롤되고, 받기 단추는 스크롤 밖 맨 아래에 고정합니다 */
 .export-side {
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-height: 0;
-  margin: -8px -12px -8px -8px;
-  padding: 8px 12px 8px 8px;
-  overflow: hidden auto;
   word-break: keep-all;
+}
+/* 세로 스크롤 상자는 옆으로 삐져나온 것을 잘라서, 입력 칸 포커스 테두리(칸 밖 7px)가 잘리지 않게 안쪽 여백을 두고
+   같은 만큼 바깥으로 넓혀 줄을 맞춥니다. */
+.export-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: -8px -12px 0 -8px;
+  padding: 8px 12px 14px 8px;
+  overflow: hidden auto;
+}
+.export-textarea {
+  min-height: 84px;
+  max-height: 280px;
+  field-sizing: content;
+  resize: vertical;
+  font-size: 11px;
+  line-height: 1.65;
 }
 .field-head {
   display: flex;
@@ -642,6 +645,50 @@ dialog:focus {
   margin: 0;
   font-weight: 600;
 }
+/* 첫 쪽을 뺄지 고르는 칸. 다른 칸 이름과 같은 굵기로 씁니다. */
+.export-option {
+  font-weight: 600;
+}
+/* 넣을 기록 목록. 문서와 같은 날짜순이고, 체크를 풀면 흐리게 보입니다. 체크는 주간 기록과 같이 바뀝니다. */
+.export-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.export-records {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fafbf7;
+}
+.export-records .check-line {
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-weight: 400;
+}
+.export-records .check-line:hover {
+  background: #f1f4ea;
+}
+.export-record-date {
+  flex: none;
+  min-width: 30px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.export-record-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.export-records .is-off .export-record-date,
+.export-records .is-off .export-record-title {
+  color: #a9afa3;
+}
 .export-callout {
   margin: 0;
   padding: 9px 12px;
@@ -656,10 +703,18 @@ dialog:focus {
   color: #8a5a3a;
 }
 .export-actions {
-  margin-top: auto;
+  flex: none;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
-.export-actions .form-actions {
-  margin-top: 0;
+.export-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.export-buttons .btn {
+  width: 100%;
+  justify-content: center;
 }
 .export-error {
   margin: 0 0 10px;
@@ -837,13 +892,18 @@ dialog:focus {
   .export-layout {
     display: block;
   }
-  .export-side {
+  .export-form {
     margin: 0;
-    padding: 0;
+    padding: 0 0 14px;
     overflow: visible;
   }
+  /* 좁은 화면은 창 전체가 스크롤되므로, 입력 칸을 보는 동안 받기 단추를 아래에 붙여 둡니다 */
   .export-actions {
-    margin-top: 4px;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-bottom: 12px;
+    background: var(--paper);
   }
   .export-viewer {
     margin-top: 18px;

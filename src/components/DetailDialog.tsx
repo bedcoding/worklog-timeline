@@ -3,7 +3,7 @@ import { dottedDate, weekdayEn } from '../lib/dates';
 import { ACCEPT_ATTR, hasFiles, imagesFromClipboard, imagesFromDrop } from '../lib/images';
 import type { ImageEntry, Settings, WorkRecord } from '../lib/types';
 import { WORK_TYPES } from '../lib/workTypes';
-import { IconChevronLeft, IconChevronRight, IconClose, IconEdit, IconExpand, IconImage, IconStar, IconTrash } from './Icons';
+import { IconChevronLeft, IconChevronRight, IconClose, IconEdit, IconExpand, IconImage, IconTrash } from './Icons';
 import { Modal } from './Modal';
 
 interface DetailDialogProps {
@@ -14,21 +14,19 @@ interface DetailDialogProps {
   imageIndex: number;
   counter: { index: number; total: number };
   checked: boolean;
-  featuredInQuarter: number;
   onImageIndex: (i: number) => void;
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onToggleFeatured: () => void;
   onToggleCheck: (value: boolean) => void;
   onAddImages: (files: File[]) => void;
   onRemoveImage: (imageId: string) => void;
   onExpand: (url: string, title: string) => void;
 }
 
-/** 기록 상세 화면. 디자인 시안의 상세 화면에 수정, 삭제, 대표 결과물 지정, 증빙 추가와 삭제를 더했습니다. */
+/** 기록 상세 화면. 디자인 시안의 상세 화면에 수정, 삭제, 증빙 추가와 삭제를 더했습니다. */
 export function DetailDialog(props: DetailDialogProps) {
   const { open, record, settings, images, imageIndex, counter, checked } = props;
   const [dropActive, setDropActive] = useState(false);
@@ -174,18 +172,6 @@ export function DetailDialog(props: DetailDialogProps) {
                 <dt>활용 효과와 메모</dt>
                 <dd>{record.effect || '아직 적지 않았어요. 수정 버튼을 눌러 이전 방식과 비교한 효과를 적어 두세요.'}</dd>
               </dl>
-              <button
-                type="button"
-                className={`star-button${record.featured ? ' selected' : ''}`}
-                aria-pressed={record.featured}
-                onClick={props.onToggleFeatured}
-              >
-                <IconStar />
-                {record.featured ? '대표 결과물로 지정됨' : '분기 대표 결과물로 지정'}
-              </button>
-              {record.featured && props.featuredInQuarter > 2 && (
-                <p className="featured-warn">이번 분기 대표 결과물이 {props.featuredInQuarter}건이에요. 양식에는 1~2건을 첨부합니다.</p>
-              )}
               <label className="detail-check">
                 <input type="checkbox" checked={checked} onChange={(e) => props.onToggleCheck(e.target.checked)} />
                 선택 내보내기에 포함

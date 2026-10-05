@@ -14,6 +14,7 @@ const escapeHtml = (text: string) => text.replace(/[&<>"]/g, (c) => ({ '&': '&am
 /**
  * 미리보기는 쪽마다 회색 바탕 위 흰 종이로 그립니다. 인쇄할 때는 종이 테두리와 쪽 여백을 걷어 내고
  * A4 여백(@page)을 Word 문서와 같게 둡니다. 긴 쪽도 넘어가는 쪽마다 같은 여백이 생깁니다.
+ * 표의 한 줄은 Word 문서처럼 쪽 사이에서 나누지 않습니다.
  */
 function printStyle(prefix: string): string {
   return `
@@ -25,6 +26,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
   box-shadow: none !important; background: #fff !important;
 }
 .${prefix}-wrapper > section.${prefix} + section.${prefix} { break-before: page; }
+tr { break-inside: avoid; }
 img { break-inside: avoid; }
 p { orphans: 2; widows: 2; }`;
 }

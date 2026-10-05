@@ -19,7 +19,6 @@ function record(patch: Partial<WorkRecord> = {}): WorkRecord {
     description: '',
     effect: '',
     toolIds: [],
-    featured: false,
     limitHit: false,
     sample: false,
     images: [],

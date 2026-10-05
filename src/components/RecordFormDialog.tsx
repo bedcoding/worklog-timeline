@@ -55,7 +55,6 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
   const [title, setTitle] = useState(record?.title ?? '');
   const [description, setDescription] = useState(record?.description ?? '');
   const [effect, setEffect] = useState(record?.effect ?? '');
-  const [featured, setFeatured] = useState(record?.featured ?? false);
   const [limitHit, setLimitHit] = useState(record?.limitHit ?? false);
   const [removed, setRemoved] = useState<string[]>([]);
   const [pending, setPending] = useState<Pending[]>(() => (initialFiles ?? []).map((file) => ({ key: uid(), file })));
@@ -93,7 +92,7 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
     setError('');
     try {
       await onSubmit(
-        { date, type, toolIds, title: cleanTitle, description: description.trim(), effect: effect.trim(), featured, limitHit },
+        { date, type, toolIds, title: cleanTitle, description: description.trim(), effect: effect.trim(), limitHit },
         pending.map((p) => p.file),
         removed,
       );
@@ -192,10 +191,6 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
           />
         </label>
         <div className="field wide checks">
-          <label className="check-line">
-            <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
-            분기 대표 결과물로 지정
-          </label>
           <label className="check-line">
             <input type="checkbox" checked={limitHit} onChange={(e) => setLimitHit(e.target.checked)} />
             이 작업 중 도구 사용 한도에 도달

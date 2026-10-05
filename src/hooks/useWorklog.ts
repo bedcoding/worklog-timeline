@@ -276,13 +276,6 @@ export function useWorklog() {
     [commit, refresh],
   );
 
-  const setFeatured = useCallback(
-    async (id: string, featured: boolean) => {
-      putRecord(await api.saveRecord({ record: { ...find(id), featured, updatedAt: Date.now() }, uploads: [] }));
-    },
-    [putRecord],
-  );
-
   const addImages = useCallback(
     async (id: string, files: File[]): Promise<ActionResult & { added: number }> => {
       const current = find(id);
@@ -403,7 +396,6 @@ export function useWorklog() {
     updateRecord,
     deleteRecord,
     deleteRecords,
-    setFeatured,
     addImages,
     removeImage,
     saveSettings,

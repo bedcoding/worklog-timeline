@@ -24,8 +24,6 @@ export interface WorkRecord {
   description: string;
   /** 효과와 메모: 이전 방식과 비교, 한계 */
   effect: string;
-  /** 분기 대표 결과물([첨부 n])로 쓸 기록 */
-  featured: boolean;
   /** 이 작업 중에 사용 한도에 도달했는지 */
   limitHit: boolean;
   images: ImageRef[];
@@ -45,6 +43,9 @@ export interface Tool {
   note: string;
 }
 
+/** 보고서 표에서 내보내기 창이 고쳐 쓰게 하는 칸 */
+export type ReportField = 'tools' | 'outputs' | 'effects' | 'opinion' | 'attachments';
+
 export interface Settings {
   team: string;
   author: string;
@@ -54,6 +55,8 @@ export interface Settings {
    * 같은 기간을 다시 내보낼 때만 불러옵니다.
    */
   periods?: Record<string, string>;
+  /** 내보내기 창에서 고쳐 쓴 보고서 칸. 보고 분기처럼 기록 날짜로 정한 기간 글을 열쇠로 두고, 같은 기간을 다시 내보낼 때만 불러옵니다. */
+  reportEdits?: Record<string, Partial<Record<ReportField, string>>>;
 }
 
 /** 아직 저장하지 않은 이미지 원본(예시 그림, 예전 브라우저 저장소에서 꺼낸 이미지) */
@@ -80,6 +83,5 @@ export interface RecordDraft {
   title: string;
   description: string;
   effect: string;
-  featured: boolean;
   limitHit: boolean;
 }

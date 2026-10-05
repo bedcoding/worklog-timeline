@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReport, reportFileName, type Report } from './report';
+import { buildReport, linesToText, reportFileName, textToLines, type Report } from './report';
 import type { Settings, WorkRecord } from './types';
 
 const settings: Settings = {
@@ -23,7 +23,6 @@ function rec(date: string, patch: Partial<WorkRecord> = {}): WorkRecord {
     title: `기록 ${seq}`,
     description: '',
     effect: '',
-    featured: false,
     limitHit: false,
     images: [],
     sample: false,
@@ -42,8 +41,8 @@ const cell = (report: Report, key: string) =>
 
 describe('buildReport', () => {
   const q3 = [
-    rec('2026-09-24', { type: 'design', toolIds: ['img'], title: '아이콘 시안', featured: true, description: '아이콘 시안 12개를 만들고\n4개를 골랐음' }),
-    rec('2026-07-03', { type: 'doc', title: '업무 매뉴얼 초안', featured: true, effect: '손으로 하던 목차 정리를\n템플릿으로 바꿈' }),
+    rec('2026-09-24', { type: 'design', toolIds: ['img'], title: '아이콘 시안', description: '아이콘 시안 12개를 만들고\n4개를 골랐음' }),
+    rec('2026-07-03', { type: 'doc', title: '업무 매뉴얼 초안', effect: '손으로 하던 목차 정리를\n템플릿으로 바꿈' }),
     rec('2026-08-12', { type: 'dev', toolIds: ['claude'], limitHit: true }),
   ];
   const report = buildReport(q3, settings);
@@ -52,7 +51,6 @@ describe('buildReport', () => {
     expect(report.quarter).toEqual({ year: 2026, quarter: 3 });
     expect(report.periodLabel).toBe('2026년 3분기');
     expect(report.records.map((r) => r.date)).toEqual(['2026-07-03', '2026-08-12', '2026-09-24']);
-    expect(report.featured.map((r) => r.title)).toEqual(['업무 매뉴얼 초안', '아이콘 시안']);
   });
 
   it('양식과 같은 여섯 칸을 같은 순서로 만든다', () => {
@@ -75,10 +73,8 @@ describe('buildReport', () => {
     expect(cell(report, 'tools')).toContain('이미지 도구 Pro  기록 1건');
   });
 
-  it('유형별 월 주기와 첨부 번호를 적는다', () => {
+  it('유형별 건수와 월 주기를 적는다', () => {
     expect(cell(report, 'outputs')).toContain('1) 개발 1건  7월 0건, 8월 1건, 9월 0건');
-    expect(cell(report, 'outputs')).toContain('[첨부 1]  업무 매뉴얼 초안 (7/3)');
-    expect(cell(report, 'outputs')).toContain('[첨부 2]  아이콘 시안 (9/24)');
     expect(cell(report, 'outputs')).toContain('전체 3건, 기록한 날 3일');
   });
 
@@ -95,9 +91,34 @@ describe('buildReport', () => {
     expect(opinion.lines.every((l) => l.muted)).toBe(true);
   });
 
-  it('첨부 파일 이름은 팀명_결과물명이고 설명은 한 줄로', () => {
-    expect(cell(report, 'attachments')).toContain('첨부 1. 기획팀_업무매뉴얼초안  업무 매뉴얼 초안');
-    expect(cell(report, 'attachments')).toContain('첨부 2. 기획팀_아이콘시안  아이콘 시안 12개를 만들고 4개를 골랐음');
+  it('첨부 결과물은 팀명_결과물명 꼴로 채울 자리만 만든다', () => {
+    const attachments = report.rows.find((r) => r.key === 'attachments')!;
+    expect(cell(report, 'attachments')).toContain('첨부 1. 기획팀_결과물명');
+    expect(attachments.lines.every((l) => l.muted)).toBe(true);
+  });
+
+  it('고쳐 쓴 칸은 같은 기간을 내보낼 때만 그 글을 쓰고, 고치기 전 내용도 함께 준다', () => {
+    const key = '2026년 3분기(7. 1.~9. 30.)';
+    const custom: Settings = {
+      ...settings,
+      reportEdits: { [key]: { opinion: 'Claude Team Premium  유지, 모두 매주 사용', attachments: '첨부 1. 기획팀_매뉴얼.pdf  초안과 수정본' } },
+    };
+    const edited = buildReport(q3, custom);
+    expect(cell(edited, 'opinion')).toBe('Claude Team Premium  유지, 모두 매주 사용');
+    expect(edited.rows.find((r) => r.key === 'opinion')!.lines[0]).toEqual({ head: 'Claude Team Premium', text: '유지, 모두 매주 사용' });
+    expect(cell(edited, 'attachments')).toBe('첨부 1. 기획팀_매뉴얼.pdf  초안과 수정본');
+    expect(edited.autoText.opinion).toContain('[유지, 증설, 감축, 반납 중 하나와 사유]');
+    expect(cell(edited, 'tools')).toBe(cell(report, 'tools'));
+    expect(cell(buildReport([rec('2026-10-02')], custom), 'opinion')).toContain('[유지, 증설, 감축, 반납 중 하나와 사유]');
+  });
+
+  it('칸 내용을 입력 칸 글로 바꿨다가 다시 읽으면 굵은 앞부분, 띄운 줄, 채울 자리가 그대로다', () => {
+    for (const row of report.rows) expect(textToLines(linesToText(row.lines))).toEqual(row.lines);
+    expect(textToLines('한계  없음\n\n  \n전체 3건\n[적을 자리]')).toEqual([
+      { head: '한계', text: '없음' },
+      { text: '전체 3건', gap: true },
+      { text: '[적을 자리]', muted: true },
+    ]);
   });
 
   it('여러 분기에 걸치면 기록 날짜 범위로 적고 기록이 있는 달만 센다', () => {
@@ -115,7 +136,7 @@ describe('buildReport', () => {
   });
 
   it('비어 있는 설정은 빈칸 표시로 채운다', () => {
-    const empty = buildReport([rec('2026-02-10', { featured: false })], blank);
+    const empty = buildReport([rec('2026-02-10')], blank);
     expect(cell(empty, 'header')).toBe('[부서], [작성자], 2026년 1분기(1. 1.~3. 31.)');
     expect(cell(empty, 'tools')).toContain('도구를 고르지 않은 기록 1건');
     expect(empty.rows.find((r) => r.key === 'attachments')!.lines[0].muted).toBe(true);
@@ -135,6 +156,10 @@ describe('buildReport', () => {
     expect(reportFileName(report, settings)).toBe('기획팀_2026년3분기_업무결과물보고서.docx');
     const mixed = buildReport([rec('2026-09-08'), rec('2026-10-05')], blank);
     expect(reportFileName(mixed, blank)).toBe('20260908-20261005_업무결과물보고서.docx');
+  });
+
+  it('첫 쪽 보고서 본문을 빼면 파일 이름 끝이 업무기록', () => {
+    expect(reportFileName(report, settings, false)).toBe('기획팀_2026년3분기_업무기록.docx');
   });
 
   it('가운데 점과 긴 줄표를 쓰지 않는다', () => {

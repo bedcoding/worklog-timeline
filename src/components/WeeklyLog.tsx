@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type InputHTM
 import { fromDay, mondayOf, shortDate, toDay, weekdayKo } from '../lib/dates';
 import type { ImageEntry, WorkRecord } from '../lib/types';
 import { WORK_TYPES } from '../lib/workTypes';
-import { IconChevronRight, IconImage, IconStar } from './Icons';
+import { IconChevronRight, IconImage } from './Icons';
 
 interface WeeklyLogProps {
   records: WorkRecord[];
@@ -208,7 +208,6 @@ function WorkRow({ record: r, active, checked, thumb, onCheck, onOpen }: WorkRow
         {r.description && <span className="row-description">{r.description}</span>}
       </button>
       <div className="row-tail">
-        {r.featured && <IconStar className="row-star" />}
         <button type="button" className="row-open" aria-label={`${r.title} 상세 보기`} onClick={onOpen}>
           ↗
         </button>

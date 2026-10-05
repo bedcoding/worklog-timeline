@@ -31,13 +31,6 @@ export const IconClose = () => (
   </svg>
 );
 
-export const STAR_PATH = 'm12 3 2.7 5.8 6.3.8-4.6 4.5 1.1 6.3L12 17.5l-5.5 2.9 1.1-6.3L3 9.6l6.3-.8Z';
-
-export const IconStar = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
-    <path d={STAR_PATH} />
-  </svg>
-);
 
 export const IconImage = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
