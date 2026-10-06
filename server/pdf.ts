@@ -117,7 +117,8 @@ export async function printPdf(file: string, args: string[], out: string, timeou
       if (ended) {
         const err = await exited;
         if (err) throw err;
-        return null;
+        // 위에서 읽는 사이에 브라우저가 PDF를 마저 쓰고 끝났을 수 있어서, 끝난 뒤에 한 번 더 읽습니다
+        return readPdf(out);
       }
       if (Date.now() >= deadline) throw new Error('PDF를 만드는 데 너무 오래 걸려요.');
       await Promise.race([exited, delay(POLL)]);

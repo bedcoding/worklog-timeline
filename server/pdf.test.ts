@@ -62,6 +62,11 @@ describe('브라우저가 PDF를 다 쓰기를 기다리기', () => {
     expect(await alive()).toBe(false);
   });
 
+  it('PDF를 다 쓰고 바로 끝나면 그 PDF를 돌려준다', async () => {
+    const pdf = await printPdf(process.execPath, fake(`fs.writeFileSync(out, ${JSON.stringify(PDF)});`), out, 30_000);
+    expect(pdf?.toString('latin1')).toBe(PDF);
+  });
+
   it('PDF를 쓰지 않고 끝나면 null', async () => {
     expect(await printPdf(process.execPath, fake(''), out, 30_000)).toBeNull();
   });
