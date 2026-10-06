@@ -1,3 +1,4 @@
+import { READ_ONLY } from '../lib/mode';
 import { BrandMark, IconPlus, IconSettings } from './Icons';
 
 interface TopBarProps {
@@ -16,14 +17,21 @@ export function TopBar({ onSettings, onAdd }: TopBarProps) {
         worklog<small>WORK TIMELINE</small>
       </div>
       <div className="top-right">
-        <button type="button" className="btn icon-text" aria-label="설정" onClick={onSettings}>
-          <IconSettings />
-          <span className="btn-label">설정</span>
-        </button>
-        <button type="button" className="btn primary" onClick={onAdd}>
-          <IconPlus />
-          기록 추가
-        </button>
+        {READ_ONLY ? (
+          // 읽기 전용 빌드는 기록을 고칠 수 없어서 설정과 기록 추가 대신 그 사실을 알립니다
+          <span className="readonly-mark">읽기 전용</span>
+        ) : (
+          <>
+            <button type="button" className="btn icon-text" aria-label="설정" onClick={onSettings}>
+              <IconSettings />
+              <span className="btn-label">설정</span>
+            </button>
+            <button type="button" className="btn primary" onClick={onAdd}>
+              <IconPlus />
+              기록 추가
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

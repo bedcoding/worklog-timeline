@@ -1086,12 +1086,11 @@ dialog:focus {
 }
 
 /* ---------- 주간 기록: 검색과 모두 펼치기 ---------- */
-/* 제목 줄 오른쪽에 검색창을 두고, 그 아래 줄에 주 수나 검색 결과 수와 모두 펼치기 단추를 둡니다 */
+/* 제목 줄 오른쪽에 검색창을 두고, 모두 펼치기는 선택 줄에 둡니다 */
 .log-tools {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
 }
 .log-search {
   width: 220px;
@@ -1102,13 +1101,15 @@ dialog:focus {
   color: var(--ink);
   font-size: 11px;
 }
-.log-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* 모두 펼치기는 선택 수 바로 오른쪽에 붙입니다(원본 시안은 선택 줄의 글자 단추를 오른쪽 끝으로 보내서 덮어씁니다) */
+.bulk-toolbar .log-toggle {
+  margin-left: 0;
 }
-.log-toggle {
-  padding-block: 3px;
+/* 선택 삭제와 선택 내보내기는 한 묶음으로 오른쪽 끝에 둡니다(읽기 전용 빌드는 선택 내보내기만 있습니다) */
+.bulk-actions {
+  display: flex;
+  gap: 14px;
+  margin-left: auto;
 }
 @media (max-width: 760px) {
   .log-heading {
@@ -1117,17 +1118,29 @@ dialog:focus {
     gap: 10px;
   }
   .log-tools {
-    align-items: stretch;
-  }
-  .log-search {
-    width: 100%;
-  }
-  .log-meta {
     justify-content: flex-end;
   }
-  /* 좁은 화면은 주 수를 숨기지만 검색 결과 수는 보여 줍니다 */
-  .log-heading .log-count.is-search {
-    display: inline;
-    margin-right: auto;
+  .log-search {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
+  /* 선택 줄이 좁으면 두 단추를 다음 줄 오른쪽에 함께 둡니다 */
+  .bulk-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+}
+
+/* ---------- 읽기 전용 빌드 ---------- */
+/* 위쪽 바 오른쪽에 설정과 기록 추가 대신 읽기 전용이라는 표시를 둡니다 */
+.readonly-mark {
+  padding: 6px 12px;
+  border: 1px solid #e2e8d8;
+  border-radius: 999px;
+  background: #edf1e6;
+  color: #526a35;
+  font-size: 11px;
+  font-weight: 600;
 }

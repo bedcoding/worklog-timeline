@@ -4,6 +4,7 @@ import { buildBackup, readBackup, type ParsedBackup } from '../lib/backup';
 import { todayISO } from '../lib/dates';
 import { blobToDataURL, checkDecodable, validateImage } from '../lib/images';
 import { legacyPayloads, markLegacyMigrated, readLegacy } from '../lib/legacy';
+import { READ_ONLY } from '../lib/mode';
 import type { ImageEntry, ImageRef, RecordDraft, Settings, WorkRecord } from '../lib/types';
 import { uid } from '../lib/util';
 
@@ -111,6 +112,8 @@ function initialize(): Promise<InitResult> {
   if (!initPromise) {
     initPromise = (async () => {
       let data = await api.load();
+      // 읽기 전용 빌드는 빌드에 넣은 기록만 보여 주므로 예시 넣기와 예전 기록 옮기기를 건너뜁니다
+      if (READ_ONLY) return { data, legacyPending: 0, notice: null };
       const legacy = await readLegacy();
       let migrated = !legacy || legacy.migrated;
       let notice: string | null = null;

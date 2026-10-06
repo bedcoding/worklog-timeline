@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { api } from '../lib/api';
 import { downloadBlob } from '../lib/download';
 import type { Png } from '../lib/images';
+import { READ_ONLY } from '../lib/mode';
 import { normalizeSettings } from '../lib/normalize';
 import { shortDate } from '../lib/dates';
 import { buildReport, byDate, REPORT_FIELDS, reportFileName } from '../lib/report';
@@ -396,7 +397,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
               <input type="checkbox" checked={imagesBelow} onChange={(e) => setImagesBelow(e.target.checked)} />
               이미지를 내용 아래에 크게
             </label>
-            {!skipForm && !settings.tools.length && (
+            {!skipForm && !settings.tools.length && !READ_ONLY && (
               <p className="export-callout">
                 사용 도구가 비어 있어요.{' '}
                 <button type="button" className="text-button inline" onClick={onOpenSettings}>

@@ -1,9 +1,11 @@
+import { READ_ONLY } from './mode';
 import { normalizeRecord, normalizeSettings } from './normalize';
 import type { ImageRef, Settings, WorkRecord } from './types';
 
 /*
  * 저장 서버(개발 서버에 붙은 /api)와 주고받는 함수.
  * 기록과 이미지는 서버가 데이터 폴더에 파일로 저장합니다.
+ * 읽기 전용 빌드는 서버 대신 빌드에 함께 넣은 data/data.json 과 data/files 아래 이미지를 읽습니다.
  */
 
 /** 새로 넣는 이미지: 이미지 id 와 데이터 URL */
@@ -31,6 +33,8 @@ export interface DataSnapshot {
 }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
+  // 읽기 전용 빌드에는 저장 서버가 없습니다(저장하는 단추는 화면에서 숨깁니다)
+  if (READ_ONLY) throw new Error('읽기 전용 화면이라 저장할 수 없어요.');
   const write = method !== 'GET';
   let res: Response;
   try {
@@ -71,6 +75,24 @@ function parseSnapshot(raw: unknown): DataSnapshot {
   };
 }
 
+/** 읽기 전용 빌드에 함께 넣은 기록 파일을 읽습니다 */
+async function staticData(): Promise<unknown> {
+  let res: Response;
+  try {
+    res = await fetch('data/data.json', { cache: 'no-store' });
+  } catch {
+    throw new Error('기록 파일을 불러오지 못했어요. 새로고침해 주세요.');
+  }
+  if (!res.ok) throw new Error(`기록 파일을 불러오지 못했어요. (${res.status})`);
+  // 로그인 뒤에 올렸을 때 로그인이 끊기면 기록 파일 대신 로그인 화면으로 돌려보내집니다.
+  // 페이지를 다시 열어 로그인 화면으로 가게 합니다.
+  if (res.redirected) {
+    location.reload();
+    return new Promise<never>(() => {});
+  }
+  return res.json();
+}
+
 function savedRecord(raw: { record?: unknown }): WorkRecord {
   const record = normalizeRecord(raw.record);
   if (!record) throw new Error('저장한 기록을 다시 읽지 못했어요. 새로고침해 주세요.');
@@ -78,7 +100,7 @@ function savedRecord(raw: { record?: unknown }): WorkRecord {
 }
 
 export const api = {
-  load: async () => parseSnapshot(await call<unknown>('GET', '/api/data')),
+  load: async () => parseSnapshot(READ_ONLY ? await staticData() : await call<unknown>('GET', '/api/data')),
 
   /** 데이터 폴더가 비어 있을 때만 들어갑니다. 다른 탭이 먼저 채웠으면 applied 가 false 입니다. */
   init: async (settings: Settings, records: RecordPayload[]) => {
@@ -105,6 +127,8 @@ export const api = {
    * 서버에 쓸 브라우저가 없으면 null 입니다(화면이 인쇄 창으로 대신 엽니다).
    */
   pdf: async (html: string): Promise<Blob | null> => {
+    // 읽기 전용 빌드에는 PDF를 만들 서버가 없어서 인쇄 창으로 저장하게 합니다
+    if (READ_ONLY) return null;
     let res: Response;
     try {
       res = await fetch('/api/pdf', {
@@ -138,7 +162,9 @@ export const api = {
     return Array.isArray(res.deleted) ? res.deleted.filter((id): id is string => typeof id === 'string') : [];
   },
 
-  saveSettings: async (settings: Settings) => normalizeSettings((await call<{ settings?: unknown }>('PUT', '/api/settings', settings)).settings),
+  // 읽기 전용 빌드에서는 내보내기 창에서 고친 칸을 저장하지 않고 이 화면에서만 씁니다
+  saveSettings: async (settings: Settings) =>
+    READ_ONLY ? normalizeSettings(settings) : normalizeSettings((await call<{ settings?: unknown }>('PUT', '/api/settings', settings)).settings),
 
   /** records 폴더를 통째로 trash 로 옮깁니다 */
   reset: () => call<{ trash: string | null }>('POST', '/api/reset'),
@@ -149,5 +175,7 @@ export const api = {
 /** 화면에 띄울 이미지 주소. 이미지 id 를 붙여서, 같은 파일 이름에 다른 이미지가 들어와도 예전 그림이 보이지 않게 합니다. */
 export function imageUrl(recordId: string, ref: ImageRef): string | null {
   if (!ref.file) return null;
-  return `/api/files/${encodeURIComponent(recordId)}/${encodeURIComponent(ref.file)}?v=${encodeURIComponent(ref.id)}`;
+  const path = `${encodeURIComponent(recordId)}/${encodeURIComponent(ref.file)}?v=${encodeURIComponent(ref.id)}`;
+  // 읽기 전용 빌드는 이미지를 data/files 아래에 기록 id 폴더와 같은 파일 이름으로 넣어 둡니다
+  return READ_ONLY ? `data/files/${path}` : `/api/files/${path}`;
 }

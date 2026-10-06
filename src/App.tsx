@@ -10,6 +10,7 @@ import { TopBar } from './components/TopBar';
 import { WeeklyLog } from './components/WeeklyLog';
 import { useToast } from './hooks/useToast';
 import { useWorklog } from './hooks/useWorklog';
+import { READ_ONLY } from './lib/mode';
 import {
   monthOf,
   periodFor,
@@ -128,7 +129,8 @@ export default function App() {
   // 대화상자가 없을 때 캡처 이미지를 붙여넣으면 바로 기록 추가 창을 엽니다
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (document.querySelector('dialog[open]')) return;
+      // 읽기 전용 빌드에서는 기록을 추가하지 않습니다
+      if (READ_ONLY || document.querySelector('dialog[open]')) return;
       const target = e.target instanceof HTMLElement ? e.target : null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       const files = imagesFromClipboard(e.clipboardData);
@@ -408,7 +410,13 @@ export default function App() {
         />
         <footer className="footer">
           <span className="footer-storage">
-            기록과 이미지는 이 PC의 <code>{store.dataDir || '데이터'}</code> 폴더에 파일로 저장됩니다.
+            {READ_ONLY ? (
+              '읽기 전용 화면입니다. 주간 기록에서 기록을 체크하고 선택 내보내기를 누르면 Word나 PDF로 받을 수 있어요.'
+            ) : (
+              <>
+                기록과 이미지는 이 PC의 <code>{store.dataDir || '데이터'}</code> 폴더에 파일로 저장됩니다.
+              </>
+            )}
           </span>
           <span className="prototype-note">오늘 {today}</span>
         </footer>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type InputHTMLAttributes } from 'react';
 import { fromDay, mondayOf, shortDate, toDay, weekdayKo } from '../lib/dates';
+import { READ_ONLY } from '../lib/mode';
 import { matchesSearch, searchTerms } from '../lib/search';
 import type { ImageEntry, WorkRecord } from '../lib/types';
 import { WORK_TYPES } from '../lib/workTypes';
@@ -113,16 +114,6 @@ export function WeeklyLog(props: WeeklyLogProps) {
               if (e.key === 'Escape') setQuery('');
             }}
           />
-          <div className="log-meta">
-            <span className={`log-count${searching ? ' is-search' : ''}`} aria-live="polite">
-              {searching ? `검색 결과 ${records.length}개` : `${weeks.length}주에 걸친 기록`}
-            </span>
-            {weeks.length > 1 && (
-              <button type="button" className="text-button log-toggle" onClick={() => setAllOpen(!allOpen)}>
-                {allOpen ? '모두 접기' : '모두 펼치기'}
-              </button>
-            )}
-          </div>
         </div>
       </div>
       <div className="bulk-toolbar">
@@ -133,17 +124,26 @@ export function WeeklyLog(props: WeeklyLogProps) {
             checked={records.length > 0 && inView === records.length}
             onChange={(e) => props.onToggleMany(records.map((r) => r.id), e.target.checked)}
           />
-          {searching ? '검색 결과 모두 선택' : '이 기간 모두 선택'}
+          <span aria-live="polite">{searching ? `검색 결과 ${records.length}개 모두 선택` : '이 기간 모두 선택'}</span>
         </label>
         <span id="selection-count" aria-live="polite">
           선택 {checkedTotal}개{hidden ? ` (${hidden} 포함)` : ''}
         </span>
-        <button type="button" className="btn danger" disabled={!checkedTotal} onClick={props.onDeleteChecked}>
-          선택 삭제
-        </button>
-        <button type="button" className="btn" disabled={!checkedTotal} onClick={props.onExportChecked}>
-          선택 내보내기
-        </button>
+        {weeks.length > 1 && (
+          <button type="button" className="text-button log-toggle" onClick={() => setAllOpen(!allOpen)}>
+            {allOpen ? '모두 접기' : '모두 펼치기'}
+          </button>
+        )}
+        <div className="bulk-actions">
+          {!READ_ONLY && (
+            <button type="button" className="btn danger" disabled={!checkedTotal} onClick={props.onDeleteChecked}>
+              선택 삭제
+            </button>
+          )}
+          <button type="button" className="btn" disabled={!checkedTotal} onClick={props.onExportChecked}>
+            선택 내보내기
+          </button>
+        </div>
       </div>
       <div ref={listRef}>
         {weeks.length ? (
@@ -207,10 +207,15 @@ export function WeeklyLog(props: WeeklyLogProps) {
           </div>
         ) : (
           <div className="log-empty">
-            이 기간에는 기록이 없어요.{' '}
-            <button type="button" className="text-button inline" onClick={props.onAdd}>
-              새 기록 추가하기
-            </button>
+            이 기간에는 기록이 없어요.
+            {!READ_ONLY && (
+              <>
+                {' '}
+                <button type="button" className="text-button inline" onClick={props.onAdd}>
+                  새 기록 추가하기
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
