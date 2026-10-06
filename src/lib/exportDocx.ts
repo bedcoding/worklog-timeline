@@ -42,6 +42,14 @@ const NOTE_WIDTH = LABEL_WIDTH + BODY_WIDTH - SHOT_WIDTH;
 /** 증빙 칸에 들어가는 이미지 크기(px). 칸 폭에서 안쪽 여백을 뺀 만큼입니다. */
 const MAX_IMAGE_WIDTH = 330;
 const MAX_IMAGE_HEIGHT = 460;
+/**
+ * 이미지를 내용 아래에 넣을 때 이미지 크기(px).
+ * 폭은 표 폭에서 안쪽 여백을 뺀 만큼이고, 높이는 내용과 첫 이미지가 한 쪽에 같이 들어가게 정했습니다.
+ */
+const WIDE_IMAGE_WIDTH = 620;
+const WIDE_IMAGE_HEIGHT = 560;
+/** 한 기록을 여러 줄에 담을 때 줄 사이에 선을 긋지 않습니다 */
+const NO_BORDER = { style: BorderStyle.NIL };
 /** 이보다 넓은 이미지는 줄여서 넣습니다(문서 크기) */
 const MAX_SOURCE_WIDTH = 1400;
 
@@ -50,6 +58,8 @@ export interface DocxOptions {
   generatedOn: string;
   /** 첫 쪽 보고서 본문(결재 양식 칸)을 넣을지. 빼면 기록 표만 담습니다. 기본은 넣습니다. */
   includeForm?: boolean;
+  /** 이미지를 내용 아래에 표 폭으로 크게 넣을지. 기본은 왼쪽 칸에 작게 넣고 오른쪽 칸에 내용을 씁니다. */
+  imagesBelow?: boolean;
   /** 같은 이미지를 여러 번 바꾸지 않도록 미리보기 창이 넘기는 변환 함수 */
   toPng?: (url: string) => Promise<Png>;
   onProgress?: (done: number, total: number) => void;
@@ -117,6 +127,30 @@ const headCell = (text: string, width: number) =>
   cell([new Paragraph({ spacing: { line: 288 }, children: [new TextRun({ text, bold: true, size: CELL_TEXT })] })], width, true);
 
 /**
+ * 이미지를 내용 아래에 넣는 기록의 줄들입니다.
+ * 첫 줄에 날짜, 제목, 내용, 효과와 첫 이미지를 담고, 다음 줄부터 이미지를 한 장씩 담습니다.
+ * 쪽은 줄 사이에서 넘어가므로 이미지가 많아도 한 장이 잘리지 않고, 제목만 쪽 끝에 남지도 않습니다.
+ * 한 기록의 줄 사이에는 선을 긋지 않아 한 칸처럼 보입니다.
+ */
+function stackedRows(notes: Paragraph[], shots: Paragraph[]): TableRow[] {
+  const parts = [[...notes, ...shots.slice(0, 1)], ...shots.slice(1).map((shot) => [shot])];
+  return parts.map(
+    (children, i) =>
+      new TableRow({
+        cantSplit: true,
+        children: [
+          new TableCell({
+            width: { size: SHOT_WIDTH + NOTE_WIDTH, type: WidthType.DXA },
+            margins: CELL_MARGINS,
+            borders: { ...(i > 0 ? { top: NO_BORDER } : {}), ...(i < parts.length - 1 ? { bottom: NO_BORDER } : {}) },
+            children,
+          }),
+        ],
+      }),
+  );
+}
+
+/**
  * Word(.docx) 문서. 첫 쪽은 전자결재 양식 칸 순서대로 채운 표, 다음 쪽부터 기록마다 증빙 이미지와 내용을 한 줄씩 담은 표입니다.
  * 첫 쪽을 빼면(포트폴리오나 결과물만 낼 때) 기록 표만 담습니다.
  */
@@ -159,8 +193,14 @@ export async function buildDocxExport(
     }),
   );
 
-  // 기록마다 한 줄: 왼쪽은 증빙 이미지, 오른쪽은 날짜, 제목, 내용과 효과(앱의 상세 화면과 같은 배치). 이미지가 없으면 두 칸을 합칩니다.
-  const rows: TableRow[] = [new TableRow({ tableHeader: true, cantSplit: true, children: [headCell('증빙', SHOT_WIDTH), headCell('작업', NOTE_WIDTH)] })];
+  // 기록마다 한 줄: 왼쪽은 증빙 이미지, 오른쪽은 날짜, 제목, 내용과 효과(앱의 상세 화면과 같은 배치).
+  // 이미지가 없으면 두 칸을 합칩니다.
+  // 이미지를 내용 아래에 넣으면 칸이 하나뿐이라 칸 이름 줄을 두지 않습니다.
+  const below = options.imagesBelow === true;
+  const [maxWidth, maxHeight] = below ? [WIDE_IMAGE_WIDTH, WIDE_IMAGE_HEIGHT] : [MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT];
+  const rows: TableRow[] = below
+    ? []
+    : [new TableRow({ tableHeader: true, cantSplit: true, children: [headCell('증빙', SHOT_WIDTH), headCell('작업', NOTE_WIDTH)] })];
   for (const r of list) {
     const shots: Paragraph[] = [];
     for (const ref of r.images) {
@@ -169,13 +209,15 @@ export async function buildDocxExport(
       try {
         if (!entry) throw new Error('missing');
         const png = await toPng(entry.url);
-        const scale = Math.min(1, MAX_IMAGE_WIDTH / png.width, MAX_IMAGE_HEIGHT / png.height);
+        const scale = Math.min(1, maxWidth / png.width, maxHeight / png.height);
         const width = Math.max(1, Math.round(png.width * scale));
         const height = Math.max(1, Math.round(png.height * scale));
-        // 이미지 아래에 설명은 달지 않습니다. 여러 장이면 사이만 조금 띄웁니다.
+        // 이미지 아래에 설명은 달지 않습니다.
+        // 옆 칸에 여러 장이면 사이만 조금 띄우고, 내용 아래에 넣으면 내용과 첫 장 사이를 띄웁니다(다음 장부터는 줄이 바뀌며 떨어집니다).
+        const gap = below ? !shots.length : shots.length > 0;
         shots.push(
           new Paragraph({
-            spacing: { before: shots.length ? 120 : 0 },
+            spacing: { before: gap ? 120 : 0 },
             children: [new ImageRun({ type: 'png', data: png.data, transformation: { width, height } })],
           }),
         );
@@ -203,13 +245,17 @@ export async function buildDocxExport(
         }),
       );
     }
-    const cells = shots.length ? [cell(shots, SHOT_WIDTH), cell(notes, NOTE_WIDTH)] : [cell(notes, SHOT_WIDTH + NOTE_WIDTH, false, 2)];
-    rows.push(new TableRow({ cantSplit: true, children: cells }));
+    if (below) {
+      rows.push(...stackedRows(notes, shots));
+    } else {
+      const cells = shots.length ? [cell(shots, SHOT_WIDTH), cell(notes, NOTE_WIDTH)] : [cell(notes, SHOT_WIDTH + NOTE_WIDTH, false, 2)];
+      rows.push(new TableRow({ cantSplit: true, children: cells }));
+    }
   }
   children.push(
     new Table({
       width: { size: SHOT_WIDTH + NOTE_WIDTH, type: WidthType.DXA },
-      columnWidths: [SHOT_WIDTH, NOTE_WIDTH],
+      columnWidths: below ? [SHOT_WIDTH + NOTE_WIDTH] : [SHOT_WIDTH, NOTE_WIDTH],
       layout: TableLayoutType.FIXED,
       borders: BORDERS,
       rows,

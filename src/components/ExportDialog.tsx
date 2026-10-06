@@ -86,8 +86,12 @@ function applyDraft(settings: Settings, draft: ReportDraft, autoPeriod: string, 
 
 const sameSettings = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
 
-/** 다 만든 문서가 지금 고른 값으로 만든 것인지 가리는 열쇠. 설정 값(JSON)과 첫 쪽을 넣었는지로 정합니다. */
-const docKeyOf = (settingsKey: string, withForm: boolean) => `${withForm ? 'report' : 'records'}:${settingsKey}`;
+/**
+ * 다 만든 문서가 지금 고른 값으로 만든 것인지 가리는 열쇠.
+ * 설정 값(JSON)과 첫 쪽을 넣었는지, 이미지를 내용 아래에 넣었는지로 정합니다.
+ */
+const docKeyOf = (settingsKey: string, withForm: boolean, imagesBelow: boolean) =>
+  `${withForm ? 'report' : 'records'}${imagesBelow ? '+below' : ''}:${settingsKey}`;
 
 /** 받을 Word 파일을 만들어 그대로 보여 주고, Word 나 PDF 로 받게 합니다. PDF 도 보여 준 그 문서를 인쇄해 만듭니다. */
 function ExportBody({ records, settings, images, today, onClose, onSaveSettings, onOpenSettings, onCheckRecords }: ExportDialogProps) {
@@ -115,6 +119,9 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   const pngs = useRef(new Map<string, Promise<Png>>());
   // 첫 쪽 보고서 본문(팀장이 결재에 올리는 양식 칸)을 뺄지. 포트폴리오나 결과물만 낼 때 씁니다. 창을 열 때마다 넣는 쪽으로 시작합니다.
   const [skipForm, setSkipForm] = useState(false);
+  // 이미지를 내용 아래에 크게 넣을지 정합니다.
+  // 몇 건을 화면 위주로 자세히 보여 줄 때 쓰고, 창을 열 때마다 왼쪽 칸에 작게 넣는 쪽으로 시작합니다.
+  const [imagesBelow, setImagesBelow] = useState(false);
   // 창을 열 때 체크돼 있던 기록. 창 안에서 체크를 풀어도 목록에 남겨 두어 다시 넣을 수 있게 합니다.
   const [listed] = useState(() => [...records].sort(byDate));
   const included = useMemo(() => new Set(records.map((r) => r.id)), [records]);
@@ -133,7 +140,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   const [committed, setCommitted] = useState<ReportDraft>(draft);
   const effectiveKey = JSON.stringify(applyDraft(settings, committed, auto, autoText));
   const effective = useMemo(() => JSON.parse(effectiveKey) as Settings, [effectiveKey]);
-  const docKey = docKeyOf(effectiveKey, !skipForm);
+  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow);
   const report = useMemo(() => buildReport(records, effective), [records, effective]);
   const fileName = reportFileName(report, effective, !skipForm);
   const pdfName = fileName.replace(/\.docx$/i, '.pdf');
@@ -224,6 +231,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
         const blob = await buildDocxExport(records, effective, images, {
           generatedOn: today,
           includeForm: !skipForm,
+          imagesBelow,
           toPng,
           signal,
           onProgress: (done, total) => {
@@ -244,7 +252,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [records, effective, skipForm, docKey, images, today]);
+  }, [records, effective, skipForm, imagesBelow, docKey, images, today]);
 
   useEffect(() => {
     if (!done) return;
@@ -310,7 +318,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
 
   // 받기를 누른 순간 칸에 보이는 값으로 만든 문서만 받습니다. 아직이면 바로 반영하고 다 만들어지면 받습니다.
   const download = (kind: FileKind) => {
-    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm);
+    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow);
     if (ready && ready.key === wanted) {
       void deliver(kind, ready.blob);
       return;
@@ -383,6 +391,10 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
             <label className="check-line export-option">
               <input type="checkbox" checked={skipForm} onChange={(e) => setSkipForm(e.target.checked)} />
               1쪽 보고서 본문 빼기
+            </label>
+            <label className="check-line export-option">
+              <input type="checkbox" checked={imagesBelow} onChange={(e) => setImagesBelow(e.target.checked)} />
+              이미지를 내용 아래에 크게
             </label>
             {!skipForm && !settings.tools.length && (
               <p className="export-callout">
