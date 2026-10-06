@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { joinDescription, splitDescription } from '../lib/cases';
 import { isValidISO } from '../lib/dates';
 import { ACCEPT_ATTR, hasFiles, imagesFromClipboard, imagesFromDrop } from '../lib/images';
-import type { ImageEntry, RecordDraft, Settings, WorkRecord, WorkType } from '../lib/types';
+import type { ImageEntry, PlainVersion, RecordDraft, Settings, WorkRecord, WorkType } from '../lib/types';
 import { uid } from '../lib/util';
 import { WORK_TYPES, WORK_TYPE_ORDER } from '../lib/workTypes';
 import { IconClose } from './Icons';
@@ -34,6 +34,10 @@ interface Pending {
   file: File;
 }
 
+const TITLE_HINT = '예: 반복하던 정리 작업을 자동화함';
+const DESCRIPTION_HINT = '무엇을 했고, 도구를 어떻게 썼는지 짧게 적어 보세요.';
+const EFFECT_HINT = '이전 방식과 비교해 적으면 보고서에 그대로 쓰기 좋아요. 예: 1건에 하루 걸리던 초안이 반나절로 줄었음';
+
 /**
  * 고른 파일 미리보기. 미리보기 주소를 effect 안에서 만들고 정리합니다.
  * (React 개발 모드는 화면을 한 번 붙였다 떼었다 다시 붙이는데, 처음에 만든 주소를 그때 정리해 버리면 그림이 깨집니다.)
@@ -61,6 +65,12 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
   // 방금 추가한 사례의 항목 칸에만 포커스를 줍니다
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [effect, setEffect] = useState(record?.effect ?? '');
+  // 제목, 내용, 효과 칸은 고른 버전의 글을 보여 줍니다. 표 없는 버전에서 비워 둔 칸은 표 있는 버전의 글이 흐리게 보입니다.
+  const [version, setVersion] = useState<'table' | 'plain'>('table');
+  const [plainTitle, setPlainTitle] = useState(record?.plain?.title ?? '');
+  const [plainDescription, setPlainDescription] = useState(record?.plain?.description ?? '');
+  const [plainEffect, setPlainEffect] = useState(record?.plain?.effect ?? '');
+  const isPlain = version === 'plain';
   const [limitHit, setLimitHit] = useState(record?.limitHit ?? false);
   const [removed, setRemoved] = useState<string[]>([]);
   const [pending, setPending] = useState<Pending[]>(() => (initialFiles ?? []).map((file) => ({ key: uid(), file })));
@@ -95,6 +105,7 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
     const cleanTitle = title.trim();
     if (!cleanTitle) {
       setError('어떤 작업을 했는지 한 줄로 적어 주세요.');
+      setVersion('table');
       titleRef.current?.focus();
       return;
     }
@@ -102,11 +113,24 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
       setError('날짜를 다시 골라 주세요.');
       return;
     }
+    const plain: PlainVersion = {};
+    if (plainTitle.trim()) plain.title = plainTitle.trim();
+    if (plainDescription.trim()) plain.description = plainDescription.trim();
+    if (plainEffect.trim()) plain.effect = plainEffect.trim();
     setBusy(true);
     setError('');
     try {
       await onSubmit(
-        { date, type, toolIds, title: cleanTitle, description: joinDescription(description, cases), effect: effect.trim(), limitHit },
+        {
+          date,
+          type,
+          toolIds,
+          title: cleanTitle,
+          description: joinDescription(description, cases),
+          effect: effect.trim(),
+          plain: Object.keys(plain).length ? plain : undefined,
+          limitHit,
+        },
         pending.map((p) => p.file),
         removed,
       );
@@ -176,84 +200,94 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
             </p>
           )}
         </div>
+        <div className="range-tabs version-tabs" role="group" aria-label="내용 버전">
+          <button type="button" className="range-tab" aria-pressed={!isPlain} onClick={() => setVersion('table')}>
+            표 있는 버전
+          </button>
+          <button type="button" className="range-tab" aria-pressed={isPlain} onClick={() => setVersion('plain')}>
+            표 없는 버전
+          </button>
+        </div>
         <label className="field wide">
           어떤 작업을 했나요?
           <input
             ref={titleRef}
-            value={title}
+            value={isPlain ? plainTitle : title}
             maxLength={80}
-            placeholder="예: 반복하던 정리 작업을 자동화함"
-            onChange={(e) => setTitle(e.target.value)}
+            placeholder={isPlain ? title.trim() || TITLE_HINT : TITLE_HINT}
+            onChange={(e) => (isPlain ? setPlainTitle : setTitle)(e.target.value)}
           />
         </label>
         <label className="field wide">
           작업 내용
           <textarea
-            value={description}
+            value={isPlain ? plainDescription : description}
             maxLength={600}
-            placeholder="무엇을 했고, 도구를 어떻게 썼는지 짧게 적어 보세요."
-            onChange={(e) => setDescription(e.target.value)}
+            placeholder={isPlain ? description.trim() || DESCRIPTION_HINT : DESCRIPTION_HINT}
+            onChange={(e) => (isPlain ? setPlainDescription : setDescription)(e.target.value)}
           />
         </label>
-        <div className="field wide">
-          <span className="field-label">AI 초안과 담당자 수정 (선택)</span>
-          {cases.length > 0 && (
-            <div className="case-list">
-              {cases.map((c, i) => (
-                <div key={c.key} className="case-card" role="group" aria-label={`사례 ${i + 1}`}>
-                  <div className="case-head">
-                    <span>사례 {i + 1}</span>
-                    <button type="button" className="text-button" aria-label={`사례 ${i + 1} 빼기`} onClick={() => removeCase(c.key)}>
-                      빼기
-                    </button>
+        {!isPlain && (
+          <div className="field wide">
+            <span className="field-label">AI 초안과 담당자 수정 (선택)</span>
+            {cases.length > 0 && (
+              <div className="case-list">
+                {cases.map((c, i) => (
+                  <div key={c.key} className="case-card" role="group" aria-label={`사례 ${i + 1}`}>
+                    <div className="case-head">
+                      <span>사례 {i + 1}</span>
+                      <button type="button" className="text-button" aria-label={`사례 ${i + 1} 빼기`} onClick={() => removeCase(c.key)}>
+                        빼기
+                      </button>
+                    </div>
+                    <input
+                      className="case-item"
+                      value={c.item}
+                      maxLength={40}
+                      autoFocus={c.key === focusKey}
+                      placeholder="항목 (예: 정렬 기준)"
+                      aria-label={`사례 ${i + 1} 항목`}
+                      onChange={(e) => editCase(c.key, 'item', e.target.value)}
+                    />
+                    <label className="case-field">
+                      AI 초안
+                      <textarea
+                        value={c.draft}
+                        maxLength={300}
+                        placeholder="AI가 처음 만든 것"
+                        aria-label={`사례 ${i + 1} AI 초안`}
+                        onChange={(e) => editCase(c.key, 'draft', e.target.value)}
+                      />
+                    </label>
+                    <label className="case-field">
+                      담당자 수정
+                      <textarea
+                        value={c.revised}
+                        maxLength={300}
+                        placeholder="검토해서 고친 것"
+                        aria-label={`사례 ${i + 1} 담당자 수정`}
+                        onChange={(e) => editCase(c.key, 'revised', e.target.value)}
+                      />
+                    </label>
                   </div>
-                  <input
-                    className="case-item"
-                    value={c.item}
-                    maxLength={40}
-                    autoFocus={c.key === focusKey}
-                    placeholder="항목 (예: 정렬 기준)"
-                    aria-label={`사례 ${i + 1} 항목`}
-                    onChange={(e) => editCase(c.key, 'item', e.target.value)}
-                  />
-                  <label className="case-field">
-                    AI 초안
-                    <textarea
-                      value={c.draft}
-                      maxLength={300}
-                      placeholder="AI가 처음 만든 것"
-                      aria-label={`사례 ${i + 1} AI 초안`}
-                      onChange={(e) => editCase(c.key, 'draft', e.target.value)}
-                    />
-                  </label>
-                  <label className="case-field">
-                    담당자 수정
-                    <textarea
-                      value={c.revised}
-                      maxLength={300}
-                      placeholder="검토해서 고친 것"
-                      aria-label={`사례 ${i + 1} 담당자 수정`}
-                      onChange={(e) => editCase(c.key, 'revised', e.target.value)}
-                    />
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
-          <p className="field-hint">
-            <button type="button" className="text-button inline" onClick={addCase}>
-              사례 추가
-            </button>{' '}
-            Word와 PDF에서 &ldquo;항목 | AI 초안 | 담당자 수정본&rdquo; 표로 들어가요.
-          </p>
-        </div>
+                ))}
+              </div>
+            )}
+            <p className="field-hint">
+              <button type="button" className="text-button inline" onClick={addCase}>
+                사례 추가
+              </button>{' '}
+              Word와 PDF에서 &ldquo;항목 | AI 초안 | 담당자 수정본&rdquo; 표로 들어가요.
+            </p>
+          </div>
+        )}
         <label className="field wide">
           효과와 메모
           <textarea
-            value={effect}
+            value={isPlain ? plainEffect : effect}
             maxLength={600}
-            placeholder="이전 방식과 비교해 적으면 보고서에 그대로 쓰기 좋아요. 예: 1건에 하루 걸리던 초안이 반나절로 줄었음"
-            onChange={(e) => setEffect(e.target.value)}
+            placeholder={isPlain ? effect.trim() || EFFECT_HINT : EFFECT_HINT}
+            onChange={(e) => (isPlain ? setPlainEffect : setEffect)(e.target.value)}
           />
         </label>
         <div className="field wide checks">

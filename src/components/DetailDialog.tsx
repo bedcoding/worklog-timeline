@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { splitCases } from '../lib/cases';
+import { useEffect, useState } from 'react';
+import { plainRecord, splitCases } from '../lib/cases';
 import { dottedDate, weekdayEn } from '../lib/dates';
 import { ACCEPT_ATTR, hasFiles, imagesFromClipboard, imagesFromDrop } from '../lib/images';
 import { READ_ONLY } from '../lib/mode';
@@ -32,6 +32,12 @@ interface DetailDialogProps {
 export function DetailDialog(props: DetailDialogProps) {
   const { open, record, settings, images, imageIndex, counter, checked } = props;
   const [dropActive, setDropActive] = useState(false);
+  // 표 없는 버전으로 볼지. 이전, 다음 기록으로 넘겨도 그대로 두고, 창을 닫으면 다음에는 표 있는 버전으로 시작합니다.
+  const [plainView, setPlainView] = useState(false);
+  useEffect(() => {
+    if (!open) setPlainView(false);
+  }, [open]);
+  const view = record && (plainView ? plainRecord(record) : record);
 
   const refs = record?.images ?? [];
   const index = Math.min(imageIndex, Math.max(0, refs.length - 1));
@@ -72,7 +78,17 @@ export function DetailDialog(props: DetailDialogProps) {
       {record && (
         <>
           <div className="modal-toolbar">
-            <h2 id="work-dialog-title">작업 기록 상세</h2>
+            <div className="modal-heading">
+              <h2 id="work-dialog-title">작업 기록 상세</h2>
+              <div className="range-tabs" role="group" aria-label="내용 버전">
+                <button type="button" className="range-tab" aria-pressed={!plainView} onClick={() => setPlainView(false)}>
+                  표 있는 버전
+                </button>
+                <button type="button" className="range-tab" aria-pressed={plainView} onClick={() => setPlainView(true)}>
+                  표 없는 버전
+                </button>
+              </div>
+            </div>
             <div className="modal-actions">
               {!READ_ONLY && (
                 <>
@@ -165,8 +181,8 @@ export function DetailDialog(props: DetailDialogProps) {
                 </span>
                 {record.limitHit && <span className="tag limit-tag">사용 한도 도달</span>}
               </div>
-              <h2>{record.title}</h2>
-              {record.description && <Description text={record.description} />}
+              <h2>{view?.title}</h2>
+              {view?.description && <Description text={view.description} />}
               {tools.length > 0 && (
                 <div className="tool-row">
                   {tools.map((t) => (
@@ -179,7 +195,7 @@ export function DetailDialog(props: DetailDialogProps) {
               <dl className="notes">
                 <dt>활용 효과와 메모</dt>
                 <dd>
-                  {record.effect || (READ_ONLY ? '적어 둔 효과가 없어요.' : '아직 적지 않았어요. 수정 버튼을 눌러 이전 방식과 비교한 효과를 적어 두세요.')}
+                  {view?.effect || (READ_ONLY ? '적어 둔 효과가 없어요.' : '아직 적지 않았어요. 수정 버튼을 눌러 이전 방식과 비교한 효과를 적어 두세요.')}
                 </dd>
               </dl>
               <label className="detail-check">

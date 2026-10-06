@@ -9,12 +9,13 @@ export function searchTerms(query: string): string[] {
 }
 
 /**
- * 기록의 제목, 내용, 효과에 검색어의 단어가 모두 들어 있는지 봅니다.
+ * 기록의 제목, 내용, 효과에 검색어의 단어가 모두 들어 있는지 봅니다. 표 없는 버전으로 따로 쓴 글도 봅니다.
  * 띄어쓰기는 가리지 않아서 "화면개선"으로 "화면 개선"도 찾습니다.
  * 제목 끝과 내용 첫머리를 이어 붙여 맞추지 않도록 칸마다 따로 봅니다.
  */
-export function matchesSearch(record: Pick<WorkRecord, 'title' | 'description' | 'effect'>, terms: string[]): boolean {
+export function matchesSearch(record: Pick<WorkRecord, 'title' | 'description' | 'effect' | 'plain'>, terms: string[]): boolean {
   if (!terms.length) return true;
-  const fields = [record.title, record.description, record.effect].map(squash);
+  const { plain } = record;
+  const fields = [record.title, record.description, record.effect, plain?.title, plain?.description, plain?.effect].map((f) => squash(f ?? ''));
   return terms.every((term) => fields.some((field) => field.includes(term)));
 }

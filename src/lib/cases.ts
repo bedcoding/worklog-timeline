@@ -1,3 +1,5 @@
+import type { WorkRecord } from './types';
+
 /** 기록 내용 안의 "AI 초안 → 담당자 수정" 사례 하나 */
 export interface CaseRow {
   /**
@@ -83,4 +85,25 @@ export function joinDescription(body: string, cases: readonly CaseRow[]): string
     .filter((c) => c.item || c.draft || c.revised)
     .map((c, i) => [c.item ? `사례 ${i + 1}. ${c.item}` : `사례 ${i + 1}`, `AI 초안: ${c.draft}`, `담당자 수정: ${c.revised}`].join('\n'));
   return [body.trim(), ...blocks].filter(Boolean).join('\n\n');
+}
+
+/** 기록 내용에서 사례 묶음을 빼고 글만 남깁니다 */
+export function withoutCases(text: string): string {
+  const parts = splitCases(text);
+  if (!parts.some((p) => p.kind === 'cases')) return text;
+  return parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n');
+}
+
+/**
+ * 표 없는 버전으로 바꾼 기록. 따로 써 둔 칸은 그 글을 쓰고, 비워 둔 칸은 표 있는 버전의 글을 씁니다.
+ * 내용에서는 어느 쪽이든 사례 표를 뺍니다.
+ */
+export function plainRecord(record: WorkRecord): WorkRecord {
+  const plain = record.plain ?? {};
+  return {
+    ...record,
+    title: plain.title || record.title,
+    description: withoutCases(plain.description || record.description),
+    effect: plain.effect || record.effect,
+  };
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { plainRecord } from '../lib/cases';
 import { downloadBlob } from '../lib/download';
 import type { Png } from '../lib/images';
 import { READ_ONLY } from '../lib/mode';
@@ -89,10 +90,10 @@ const sameSettings = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.st
 
 /**
  * 다 만든 문서가 지금 고른 값으로 만든 것인지 가리는 열쇠.
- * 설정 값(JSON)과 첫 쪽을 넣었는지, 이미지를 내용 아래에 넣었는지, 날짜를 뺐는지로 정합니다.
+ * 설정 값(JSON)과 첫 쪽을 넣었는지, 이미지를 내용 아래에 넣었는지, 날짜를 뺐는지, 표 없는 버전인지로 정합니다.
  */
-const docKeyOf = (settingsKey: string, withForm: boolean, imagesBelow: boolean, hideDates: boolean) =>
-  `${withForm ? 'report' : 'records'}${imagesBelow ? '+below' : ''}${hideDates ? '+nodate' : ''}:${settingsKey}`;
+const docKeyOf = (settingsKey: string, withForm: boolean, imagesBelow: boolean, hideDates: boolean, plainVersion: boolean) =>
+  `${withForm ? 'report' : 'records'}${imagesBelow ? '+below' : ''}${hideDates ? '+nodate' : ''}${plainVersion ? '+plain' : ''}:${settingsKey}`;
 
 /** 받을 Word 파일을 만들어 그대로 보여 주고, Word 나 PDF 로 받게 합니다. PDF 도 보여 준 그 문서를 인쇄해 만듭니다. */
 function ExportBody({ records, settings, images, today, onClose, onSaveSettings, onOpenSettings, onCheckRecords }: ExportDialogProps) {
@@ -118,8 +119,11 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   } | null>(null);
   // 내용을 고쳐 다시 만들 때 이미지를 또 바꾸지 않도록 창이 열려 있는 동안 PNG 를 모아 둡니다
   const pngs = useRef(new Map<string, Promise<Png>>());
-  // 첫 쪽 보고서 본문(팀장이 결재에 올리는 양식 칸)을 뺄지. 포트폴리오나 결과물만 낼 때 씁니다. 창을 열 때마다 넣는 쪽으로 시작합니다.
+  // 첫 쪽 보고서 본문(팀장이 결재에 올리는 양식 칸)을 뺄지. 기록 표만 따로 낼 때 씁니다. 창을 열 때마다 넣는 쪽으로 시작합니다.
   const [skipForm, setSkipForm] = useState(false);
+  // 기록마다 표 없는 버전으로 넣을지 정합니다. 첫 쪽 칸도 그 글로 채웁니다.
+  // 창을 열 때마다 사례 표가 있는 버전으로 시작합니다.
+  const [plainVersion, setPlainVersion] = useState(false);
   // 이미지를 내용 아래에 크게 넣을지 정합니다.
   // 몇 건을 화면 위주로 자세히 보여 줄 때 쓰고, 창을 열 때마다 왼쪽 칸에 작게 넣는 쪽으로 시작합니다.
   const [imagesBelow, setImagesBelow] = useState(false);
@@ -129,9 +133,11 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   // 창을 열 때 체크돼 있던 기록. 창 안에서 체크를 풀어도 목록에 남겨 두어 다시 넣을 수 있게 합니다.
   const [listed] = useState(() => [...records].sort(byDate));
   const included = useMemo(() => new Set(records.map((r) => r.id)), [records]);
+  // 문서에 넣는 기록. 표 없는 버전을 고르면 기록마다 그 버전의 제목, 내용, 효과로 바꿉니다.
+  const shown = useMemo(() => (plainVersion ? records.map(plainRecord) : records), [records, plainVersion]);
 
   // 보고 분기는 기록 날짜로 정하고, 고쳐 쓴 값은 그 기간 글을 열쇠로 저장합니다
-  const base = useMemo(() => buildReport(records, settings), [records, settings]);
+  const base = useMemo(() => buildReport(shown, settings), [shown, settings]);
   const auto = base.autoPeriodText;
   const autoText = base.autoText;
   // draft 는 칸에 보이는 값, committed 는 손을 멈춘 뒤 문서와 설정에 반영한 값입니다
@@ -144,8 +150,8 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   const [committed, setCommitted] = useState<ReportDraft>(draft);
   const effectiveKey = JSON.stringify(applyDraft(settings, committed, auto, autoText));
   const effective = useMemo(() => JSON.parse(effectiveKey) as Settings, [effectiveKey]);
-  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow, hideDates);
-  const report = useMemo(() => buildReport(records, effective), [records, effective]);
+  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow, hideDates, plainVersion);
+  const report = useMemo(() => buildReport(shown, effective), [shown, effective]);
   const fileName = reportFileName(report, effective, !skipForm);
   const pdfName = fileName.replace(/\.docx$/i, '.pdf');
   const imageCount = records.reduce((n, r) => n + r.images.length, 0);
@@ -232,7 +238,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
           }
           return job;
         };
-        const blob = await buildDocxExport(records, effective, images, {
+        const blob = await buildDocxExport(shown, effective, images, {
           generatedOn: today,
           includeForm: !skipForm,
           imagesBelow,
@@ -257,7 +263,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [records, effective, skipForm, imagesBelow, hideDates, docKey, images, today]);
+  }, [shown, effective, skipForm, imagesBelow, hideDates, docKey, images, today]);
 
   useEffect(() => {
     if (!done) return;
@@ -323,7 +329,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
 
   // 받기를 누른 순간 칸에 보이는 값으로 만든 문서만 받습니다. 아직이면 바로 반영하고 다 만들어지면 받습니다.
   const download = (kind: FileKind) => {
-    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow, hideDates);
+    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow, hideDates, plainVersion);
     if (ready && ready.key === wanted) {
       void deliver(kind, ready.blob);
       return;
@@ -398,6 +404,10 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
               1쪽 보고서 본문 빼기
             </label>
             <label className="check-line export-option">
+              <input type="checkbox" checked={plainVersion} onChange={(e) => setPlainVersion(e.target.checked)} />
+              표 없는 버전으로
+            </label>
+            <label className="check-line export-option">
               <input type="checkbox" checked={imagesBelow} onChange={(e) => setImagesBelow(e.target.checked)} />
               이미지를 내용 아래에 크게
             </label>
@@ -466,15 +476,18 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
                 )}
               </div>
               <ul className="export-records" role="group" aria-labelledby={`${id}-records`}>
-                {listed.map((r) => (
-                  <li key={r.id}>
-                    <label className={`check-line${included.has(r.id) ? '' : ' is-off'}`} title={r.title}>
-                      <input type="checkbox" checked={included.has(r.id)} onChange={(e) => onCheckRecords([r.id], e.target.checked)} />
-                      <span className="export-record-date">{shortDate(r.date)}</span>
-                      <span className="export-record-title">{r.title}</span>
-                    </label>
-                  </li>
-                ))}
+                {listed.map((r) => {
+                  const title = plainVersion ? plainRecord(r).title : r.title;
+                  return (
+                    <li key={r.id}>
+                      <label className={`check-line${included.has(r.id) ? '' : ' is-off'}`} title={title}>
+                        <input type="checkbox" checked={included.has(r.id)} onChange={(e) => onCheckRecords([r.id], e.target.checked)} />
+                        <span className="export-record-date">{shortDate(r.date)}</span>
+                        <span className="export-record-title">{title}</span>
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>

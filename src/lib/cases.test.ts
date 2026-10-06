@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { joinDescription, splitCases, splitDescription } from './cases';
+import { joinDescription, plainRecord, splitCases, splitDescription, withoutCases } from './cases';
 import type { WorkRecord } from './types';
 
 describe('사례 나누기', () => {
@@ -93,5 +93,44 @@ describe('입력 화면의 내용 칸과 사례 칸', () => {
       { kind: 'text', text: '개요' },
       { kind: 'cases', rows: [{ item: '', draft: '가', revised: '나' }] },
     ]);
+  });
+});
+
+describe('표 없는 버전', () => {
+  const withCases = joinDescription('초안을 받아 화면을 만듦.', [{ item: '정렬 기준', draft: '최신순만 지원했음.', revised: '인기순을 추가함.' }]);
+  const record = (patch: Partial<WorkRecord> = {}): WorkRecord => ({
+    id: 'a1',
+    date: '2026-09-03',
+    type: 'dev',
+    toolIds: [],
+    title: '정렬 화면',
+    description: withCases,
+    effect: '초안을 하루 만에 받음.',
+    limitHit: false,
+    images: [],
+    sample: false,
+    createdAt: 1,
+    updatedAt: 1,
+    ...patch,
+  });
+
+  it('사례 묶음을 빼고 글만 남긴다', () => {
+    expect(withoutCases(withCases)).toBe('초안을 받아 화면을 만듦.');
+    expect(withoutCases('사례 없는 글.\n둘째 줄.')).toBe('사례 없는 글.\n둘째 줄.');
+  });
+
+  it('따로 쓴 제목, 내용, 효과가 있으면 그 글을 쓴다', () => {
+    const plain = plainRecord(record({ plain: { title: '정렬 화면 (관리자)', description: '인기순 정렬을 더함.', effect: '원하는 순서로 볼 수 있게 됨.' } }));
+    expect([plain.title, plain.description, plain.effect]).toEqual(['정렬 화면 (관리자)', '인기순 정렬을 더함.', '원하는 순서로 볼 수 있게 됨.']);
+  });
+
+  it('비워 둔 칸은 표 있는 버전의 글을 쓰고, 내용에서는 사례 표를 뺀다', () => {
+    const plain = plainRecord(record({ plain: { effect: '원하는 순서로 볼 수 있게 됨.' } }));
+    expect([plain.title, plain.description, plain.effect]).toEqual(['정렬 화면', '초안을 받아 화면을 만듦.', '원하는 순서로 볼 수 있게 됨.']);
+    expect(plainRecord(record()).description).toBe('초안을 받아 화면을 만듦.');
+  });
+
+  it('따로 쓴 내용에 사례 줄이 들어 있어도 표로 만들지 않는다', () => {
+    expect(splitCases(plainRecord(record({ plain: { description: withCases } })).description).every((p) => p.kind === 'text')).toBe(true);
   });
 });

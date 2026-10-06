@@ -25,6 +25,12 @@ describe('기록 검색', () => {
     expect(matchesSearch(record('제목', '내용', '효과'), searchTerms('없는말'))).toBe(false);
   });
 
+  it('표 없는 버전으로 따로 쓴 글도 본다', () => {
+    const r = { ...record('제목', '내용', '효과'), plain: { title: '따로 쓴 제목', description: '따로 쓴 내용', effect: '따로 쓴 효과' } };
+    expect(['따로쓴제목', '따로쓴내용', '따로쓴효과'].every((q) => matchesSearch(r, searchTerms(q)))).toBe(true);
+    expect(matchesSearch(r, searchTerms('없는말'))).toBe(false);
+  });
+
   it('영문 대소문자를 가리지 않는다', () => {
     expect(matchesSearch(record('React 전환'), searchTerms('react'))).toBe(true);
   });

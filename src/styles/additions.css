@@ -376,6 +376,38 @@ dialog:focus {
   margin: 0 4px;
   background: var(--line);
 }
+/* 위쪽 바 왼쪽에 제목과 버전 탭을 나란히 둡니다. 탭 모양은 기간 탭과 같고, 바 높이에 맞춰 조금 작게 씁니다. */
+.modal-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.modal-heading h2 {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.modal-heading .range-tabs {
+  padding: 3px;
+}
+.modal-heading .range-tab {
+  min-height: 26px;
+  padding: 4px 11px;
+  font-size: 10px;
+}
+/* 폰 너비에서는 제목과 탭을 한 줄에 두고, 이동과 닫기 단추는 다음 줄 오른쪽으로 내립니다 */
+@media (max-width: 760px) {
+  .modal-toolbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .modal-heading {
+    flex: 1 1 100%;
+  }
+  .modal-actions {
+    margin-left: auto;
+  }
+}
 .stage-empty {
   display: flex;
   flex-direction: column;
@@ -421,6 +453,11 @@ dialog:focus {
 /* ---------- 기록 추가, 수정 폼 ---------- */
 .record-dialog {
   width: min(640px, calc(100% - 28px));
+}
+/* 제목, 내용, 효과를 어느 버전으로 적을지 고르는 탭. 모양은 위쪽 기간 탭과 같습니다. */
+.version-tabs {
+  grid-column: 1 / -1;
+  justify-self: start;
 }
 .field-label {
   font-size: 11px;

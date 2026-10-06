@@ -194,7 +194,7 @@ function stackedRows(head: Paragraph, notes: (Paragraph | Table)[], shots: Parag
 
 /**
  * Word(.docx) 문서. 첫 쪽은 전자결재 양식 칸 순서대로 채운 표, 다음 쪽부터 기록마다 증빙 이미지와 내용을 한 줄씩 담은 표입니다.
- * 첫 쪽을 빼면(포트폴리오나 결과물만 낼 때) 기록 표만 담습니다.
+ * 첫 쪽을 빼면 기록 표만 담습니다. 표 없는 버전으로 받을 때는 내보내기 창이 기록을 그 버전으로 바꿔서 넘깁니다.
  */
 export async function buildDocxExport(
   records: readonly WorkRecord[],

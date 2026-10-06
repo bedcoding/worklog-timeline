@@ -80,6 +80,16 @@ describe('데이터 폴더 저장소', () => {
     expect(bytes.equals(Buffer.from(PNG.split(',')[1], 'base64'))).toBe(true);
   });
 
+  it('표 없는 버전은 글이 있는 칸만 효과 다음 자리에 저장하고, 다 비우면 뺀다', async () => {
+    await storage.saveRecord({ record: record({ effect: '효과', plain: { title: ' ', description: ' 따로 쓴 내용 ' } }), uploads: [] });
+    const saved = await readJson('records/2026-10-01_a1b2c3d4/record.json');
+    expect(saved.plain).toEqual({ description: '따로 쓴 내용' });
+    expect(Object.keys(saved).slice(4, 7)).toEqual(['description', 'effect', 'plain']);
+    expect((await storage.load()).records[0].plain).toEqual({ description: '따로 쓴 내용' });
+    await storage.saveRecord({ record: record({ plain: { effect: '' } }), uploads: [] });
+    expect((await readJson('records/2026-10-01_a1b2c3d4/record.json')).plain).toBeUndefined();
+  });
+
   it('날짜를 바꾸면 폴더 이름을 바꾸고, 뺀 이미지는 trash 로 옮긴다', async () => {
     const first = await storage.saveRecord({
       record: record({

@@ -1,5 +1,5 @@
 import { isValidISO } from './dates.ts';
-import type { ImageRef, ReportField, Settings, Tool, WorkRecord } from './types.ts';
+import type { ImageRef, PlainVersion, ReportField, Settings, Tool, WorkRecord } from './types.ts';
 import { isWorkType } from './workTypes.ts';
 
 /*
@@ -68,6 +68,18 @@ function normalizeImage(raw: unknown): ImageRef | null {
   return ref;
 }
 
+/** 표 없는 버전에서 글이 있는 칸만 남깁니다. 남는 칸이 없으면 undefined */
+function normalizePlain(raw: unknown): PlainVersion | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const p = raw as Record<string, unknown>;
+  const plain: PlainVersion = {};
+  for (const key of ['title', 'description', 'effect'] as const) {
+    const text = str(p[key]).trim();
+    if (text) plain[key] = text;
+  }
+  return Object.keys(plain).length ? plain : undefined;
+}
+
 /** 쓸 수 없는 기록이면 null. 키 순서는 record.json 을 열어 볼 때 읽기 좋은 순서입니다. */
 export function normalizeRecord(raw: unknown): WorkRecord | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -76,6 +88,7 @@ export function normalizeRecord(raw: unknown): WorkRecord | null {
   const title = str(r.title).trim();
   if (!SAFE_ID.test(id) || !title || !isValidISO(r.date)) return null;
   const images = Array.isArray(r.images) ? r.images.map(normalizeImage).filter((i): i is ImageRef => !!i) : [];
+  const plain = normalizePlain(r.plain);
   const now = Date.now();
   return {
     id,
@@ -84,6 +97,7 @@ export function normalizeRecord(raw: unknown): WorkRecord | null {
     type: isWorkType(r.type) ? r.type : 'etc',
     description: str(r.description),
     effect: str(r.effect),
+    ...(plain ? { plain } : {}),
     toolIds: Array.isArray(r.toolIds) ? r.toolIds.filter((t): t is string => typeof t === 'string') : [],
     limitHit: r.limitHit === true,
     sample: r.sample === true,

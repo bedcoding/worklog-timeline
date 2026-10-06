@@ -24,6 +24,8 @@ export interface WorkRecord {
   description: string;
   /** 효과와 메모: 이전 방식과 비교, 한계 */
   effect: string;
+  /** 표 없는 버전으로 따로 쓴 글. 위의 제목, 내용, 효과는 표 있는 버전입니다. */
+  plain?: PlainVersion;
   /** 이 작업 중에 사용 한도에 도달했는지 */
   limitHit: boolean;
   images: ImageRef[];
@@ -31,6 +33,16 @@ export interface WorkRecord {
   sample: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * 사례 표 없이 따로 쓴 제목, 내용, 효과. 내보내기에서 "표 없는 버전으로"를 고르면 이 글을 씁니다.
+ * 비워 둔 칸은 표 있는 버전의 글을 쓰고, 내용에서는 사례 표만 뺍니다.
+ */
+export interface PlainVersion {
+  title?: string;
+  description?: string;
+  effect?: string;
 }
 
 /** 팀이 쓰는 도구(좌석). 보고서의 「사용 도구 / 좌석 등급」 칸을 만듭니다. */
@@ -83,5 +95,6 @@ export interface RecordDraft {
   title: string;
   description: string;
   effect: string;
+  plain?: PlainVersion;
   limitHit: boolean;
 }
