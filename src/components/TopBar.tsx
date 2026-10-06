@@ -1,4 +1,4 @@
-import { READ_ONLY } from '../lib/mode';
+import { READ_ONLY, SAMPLE_VIEW } from '../lib/mode';
 import { BrandMark, IconPlus, IconSettings } from './Icons';
 
 interface TopBarProps {
@@ -18,8 +18,14 @@ export function TopBar({ onSettings, onAdd }: TopBarProps) {
       </div>
       <div className="top-right">
         {READ_ONLY ? (
-          // 읽기 전용 빌드는 기록을 고칠 수 없어서 설정과 기록 추가 대신 그 사실을 알립니다
-          <span className="readonly-mark">읽기 전용</span>
+          // 읽기 전용 빌드는 기록을 고칠 수 없어서 설정과 기록 추가 대신 그 사실을 알립니다.
+          // 예시 기록과 실제 기록은 주소의 ?sample 로 나누고, 오갈 때는 페이지를 새로 엽니다.
+          <>
+            <span className="readonly-mark">{SAMPLE_VIEW ? '예시 기록' : '읽기 전용'}</span>
+            <a className="btn" href={SAMPLE_VIEW ? './' : '?sample'}>
+              {SAMPLE_VIEW ? '실제 기록 보기' : '샘플 보기'}
+            </a>
+          </>
         ) : (
           <>
             <button type="button" className="btn icon-text" aria-label="설정" onClick={onSettings}>

@@ -1236,6 +1236,11 @@ dialog:focus {
 
 /* ---------- 읽기 전용 빌드 ---------- */
 /* 위쪽 바 오른쪽에 설정과 기록 추가 대신 읽기 전용이라는 표시를 둡니다 */
+/* 샘플 보기 단추는 주소를 바꾸는 링크라서 링크 밑줄과 색을 지웁니다 */
+a.btn {
+  color: var(--ink);
+  text-decoration: none;
+}
 .readonly-mark {
   padding: 6px 12px;
   border: 1px solid #e2e8d8;

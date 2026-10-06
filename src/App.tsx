@@ -10,7 +10,7 @@ import { TopBar } from './components/TopBar';
 import { WeeklyLog } from './components/WeeklyLog';
 import { useToast } from './hooks/useToast';
 import { useWorklog } from './hooks/useWorklog';
-import { READ_ONLY } from './lib/mode';
+import { READ_ONLY, SAMPLE_VIEW } from './lib/mode';
 import {
   monthOf,
   periodFor,
@@ -414,7 +414,11 @@ export default function App() {
         <footer className="footer">
           <span className="footer-storage">
             {READ_ONLY ? (
-              '읽기 전용 화면입니다. 주간 기록에서 기록을 체크하고 선택 내보내기를 누르면 Word나 PDF로 받을 수 있어요.'
+              SAMPLE_VIEW ? (
+                '예시 기록을 보는 중입니다. 기록을 체크하고 선택 내보내기를 누르면 사례 표가 들어간 Word를 받아 볼 수 있어요.'
+              ) : (
+                '읽기 전용 화면입니다. 주간 기록에서 기록을 체크하고 선택 내보내기를 누르면 Word나 PDF로 받을 수 있어요.'
+              )
             ) : (
               <>
                 기록과 이미지는 이 PC의 <code>{store.dataDir || '데이터'}</code> 폴더에 파일로 저장됩니다.

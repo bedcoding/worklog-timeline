@@ -1,6 +1,11 @@
-import { READ_ONLY } from './mode';
+import { todayISO } from './dates';
+import { READ_ONLY, SAMPLE_VIEW } from './mode';
 import { normalizeRecord, normalizeSettings } from './normalize';
+import { shiftSampleDates } from './samples';
 import type { ImageRef, Settings, WorkRecord } from './types';
+
+/** 읽기 전용 빌드에서 기록 파일과 이미지를 읽는 폴더. 샘플 보기는 예시 기록을 넣은 sample 폴더를 읽습니다. */
+const STATIC_DIR = SAMPLE_VIEW ? 'sample' : 'data';
 
 /*
  * 저장 서버(개발 서버에 붙은 /api)와 주고받는 함수.
@@ -79,7 +84,7 @@ function parseSnapshot(raw: unknown): DataSnapshot {
 async function staticData(): Promise<unknown> {
   let res: Response;
   try {
-    res = await fetch('data/data.json', { cache: 'no-store' });
+    res = await fetch(`${STATIC_DIR}/data.json`, { cache: 'no-store' });
   } catch {
     throw new Error('기록 파일을 불러오지 못했어요. 새로고침해 주세요.');
   }
@@ -100,7 +105,12 @@ function savedRecord(raw: { record?: unknown }): WorkRecord {
 }
 
 export const api = {
-  load: async () => parseSnapshot(READ_ONLY ? await staticData() : await call<unknown>('GET', '/api/data')),
+  load: async () => {
+    if (!READ_ONLY) return parseSnapshot(await call<unknown>('GET', '/api/data'));
+    const snapshot = parseSnapshot(await staticData());
+    // 예시 기록은 로컬에서 예시를 넣을 때처럼 가장 최근 예시가 오늘이 되게 날짜를 옮깁니다
+    return SAMPLE_VIEW ? { ...snapshot, records: shiftSampleDates(snapshot.records, todayISO()) } : snapshot;
+  },
 
   /** 데이터 폴더가 비어 있을 때만 들어갑니다. 다른 탭이 먼저 채웠으면 applied 가 false 입니다. */
   init: async (settings: Settings, records: RecordPayload[]) => {
@@ -176,6 +186,6 @@ export const api = {
 export function imageUrl(recordId: string, ref: ImageRef): string | null {
   if (!ref.file) return null;
   const path = `${encodeURIComponent(recordId)}/${encodeURIComponent(ref.file)}?v=${encodeURIComponent(ref.id)}`;
-  // 읽기 전용 빌드는 이미지를 data/files 아래에 기록 id 폴더와 같은 파일 이름으로 넣어 둡니다
-  return READ_ONLY ? `data/files/${path}` : `/api/files/${path}`;
+  // 읽기 전용 빌드는 이미지를 data/files(샘플은 sample/files) 아래에 기록 id 폴더와 같은 파일 이름으로 넣어 둡니다
+  return READ_ONLY ? `${STATIC_DIR}/files/${path}` : `/api/files/${path}`;
 }
