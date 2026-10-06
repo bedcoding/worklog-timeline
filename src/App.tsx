@@ -207,6 +207,8 @@ export default function App() {
       return next;
     });
 
+  const clearChecked = () => setChecked(new Set());
+
   const deleteChecked = async () => {
     const ids = checkedRecords.map((r) => r.id);
     if (!ids.length) return;
@@ -403,6 +405,7 @@ export default function App() {
           reveal={reveal}
           onToggleCheck={toggleCheck}
           onToggleMany={toggleMany}
+          onClearChecked={clearChecked}
           onDeleteChecked={deleteChecked}
           onExportChecked={() => setExportOpen(true)}
           onOpen={(id) => openDetail(id, 'list')}

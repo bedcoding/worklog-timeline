@@ -1105,6 +1105,17 @@ dialog:focus {
 .bulk-toolbar .log-toggle {
   margin-left: 0;
 }
+/* 선택 수와 해제 단추를 한 덩어리로 붙여 둡니다 */
+.selection-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #7f8c70;
+  font-size: 10px;
+}
+.bulk-toolbar .selection-clear {
+  margin-left: 0;
+}
 /* 선택 삭제와 선택 내보내기는 한 묶음으로 오른쪽 끝에 둡니다(읽기 전용 빌드는 선택 내보내기만 있습니다) */
 .bulk-actions {
   display: flex;
@@ -1124,6 +1135,11 @@ dialog:focus {
     flex: 1;
     width: auto;
     min-width: 0;
+  }
+  /* 폰에서는 선택 수를 해제 단추와 함께 오른쪽에 붙입니다 */
+  .selection-summary {
+    margin-left: auto;
+    font-size: 9px;
   }
   /* 선택 줄이 좁으면 두 단추를 다음 줄 오른쪽에 함께 둡니다 */
   .bulk-actions {

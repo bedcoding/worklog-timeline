@@ -18,6 +18,8 @@ interface WeeklyLogProps {
   onToggleCheck: (id: string, value: boolean) => void;
   /** 여러 기록을 한꺼번에 체크하거나 풉니다(이 기간 모두, 주 단위) */
   onToggleMany: (ids: string[], value: boolean) => void;
+  /** 체크를 모두 풉니다(다른 기간과 검색 밖에서 체크한 것까지) */
+  onClearChecked: () => void;
   onDeleteChecked: () => void;
   onExportChecked: () => void;
   onOpen: (id: string) => void;
@@ -36,6 +38,8 @@ function TriCheckbox({ indeterminate, ...rest }: InputHTMLAttributes<HTMLInputEl
 export function WeeklyLog(props: WeeklyLogProps) {
   const { records: periodRecords, periodKey, selectedId, checked, checkedTotal, images, reveal } = props;
   const listRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // 검색어가 있으면 지금 보는 기간에서 제목, 내용, 효과에 맞는 기록만 보여 줍니다
   const [query, setQuery] = useState('');
@@ -92,8 +96,17 @@ export function WeeklyLog(props: WeeklyLogProps) {
       el?.focus({ preventScroll: true });
       el?.scrollIntoView({ block: 'nearest' });
     });
-    // reveal 이 바뀔 때만 한 번 처리합니다. opened, records 가 바뀔 때 다시 돌지 않도록 의존성에서 뺐습니다.
+    // reveal이 바뀔 때만 한 번 처리합니다.
+    // opened, records가 바뀔 때 다시 돌지 않도록 의존성에서 뺐습니다.
   }, [reveal]);
+
+  // 해제 단추는 누르면 사라져서 포커스를 바로 왼쪽의 모두 선택 체크로 옮깁니다.
+  // 검색 결과가 없어 체크를 누를 수 없으면 검색창으로 옮깁니다.
+  const clearChecked = () => {
+    props.onClearChecked();
+    const box = toolbarRef.current?.querySelector<HTMLInputElement>('.bulk-check input:not(:disabled)');
+    (box ?? searchRef.current)?.focus();
+  };
 
   return (
     <section className="log-section" aria-labelledby="weekly-heading">
@@ -104,6 +117,7 @@ export function WeeklyLog(props: WeeklyLogProps) {
         </div>
         <div className="log-tools">
           <input
+            ref={searchRef}
             type="search"
             className="log-search"
             value={query}
@@ -116,7 +130,7 @@ export function WeeklyLog(props: WeeklyLogProps) {
           />
         </div>
       </div>
-      <div className="bulk-toolbar">
+      <div className="bulk-toolbar" ref={toolbarRef}>
         <label className="bulk-check">
           <TriCheckbox
             indeterminate={inView > 0 && inView < records.length}
@@ -126,8 +140,16 @@ export function WeeklyLog(props: WeeklyLogProps) {
           />
           <span aria-live="polite">{searching ? `검색 결과 ${records.length}개 모두 선택` : '이 기간 모두 선택'}</span>
         </label>
-        <span id="selection-count" aria-live="polite">
-          선택 {checkedTotal}개{hidden ? ` (${hidden} 포함)` : ''}
+        {/* 목록에 안 보이는 체크(다른 기간, 검색 밖)는 여기서만 풀 수 있어서 선택 수 바로 옆에 둡니다 */}
+        <span className="selection-summary">
+          <span id="selection-count" aria-live="polite">
+            선택 {checkedTotal}개{hidden ? ` (${hidden} 포함)` : ''}
+          </span>
+          {checkedTotal > 0 && (
+            <button type="button" className="text-button inline selection-clear" aria-label="체크한 기록 모두 해제" onClick={clearChecked}>
+              해제
+            </button>
+          )}
         </span>
         {weeks.length > 1 && (
           <button type="button" className="text-button log-toggle" onClick={() => setAllOpen(!allOpen)}>
