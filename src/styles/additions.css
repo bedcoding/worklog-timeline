@@ -475,6 +475,48 @@ dialog:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* 상세 화면의 기록 내용: 글은 쓴 줄 그대로 보이고, 사례는 항목을 머리로 둔 세로 표로 보입니다 */
+.description p {
+  margin: 0;
+  white-space: pre-line;
+}
+.description p + p,
+.description p + .case-tables,
+.description .case-tables + p {
+  margin-top: 10px;
+}
+.case-tables {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.case-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.case-table th,
+.case-table td {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  word-break: keep-all;
+}
+.case-table thead th {
+  background: #e7ebe0;
+  font-weight: 600;
+}
+.case-table tbody th {
+  width: 6.2em;
+  background: #f4f6ef;
+  font-weight: 600;
+  color: var(--muted);
+}
 .tool-picker {
   display: flex;
   flex-wrap: wrap;

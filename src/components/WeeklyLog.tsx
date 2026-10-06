@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type InputHTMLAttributes } from 'react';
+import { splitDescription } from '../lib/cases';
 import { fromDay, mondayOf, shortDate, toDay, weekdayKo } from '../lib/dates';
 import { READ_ONLY } from '../lib/mode';
 import { matchesSearch, searchTerms } from '../lib/search';
@@ -256,6 +257,7 @@ interface WorkRowProps {
 
 function WorkRow({ record: r, active, checked, thumb, onCheck, onOpen }: WorkRowProps) {
   const type = WORK_TYPES[r.type];
+  const summary = splitDescription(r.description).body;
   return (
     <article className={`work-row${active ? ' is-active' : ''}`} data-row={r.id}>
       <label className="row-check">
@@ -281,7 +283,8 @@ function WorkRow({ record: r, active, checked, thumb, onCheck, onOpen }: WorkRow
           {r.limitHit && <span className="row-flag">한도 도달</span>}
         </span>
         <span className="row-title">{r.title}</span>
-        {r.description && <span className="row-description">{r.description}</span>}
+        {/* 목록에서는 한 줄만 보이므로 사례 줄은 빼고 앞의 설명만 보여 줍니다 */}
+        {summary && <span className="row-description">{summary}</span>}
       </button>
       <div className="row-tail">
         <button type="button" className="row-open" aria-label={`${r.title} 상세 보기`} onClick={onOpen}>

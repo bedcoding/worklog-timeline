@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { splitCases } from '../lib/cases';
 import { dottedDate, weekdayEn } from '../lib/dates';
 import { ACCEPT_ATTR, hasFiles, imagesFromClipboard, imagesFromDrop } from '../lib/images';
 import { READ_ONLY } from '../lib/mode';
@@ -165,7 +166,7 @@ export function DetailDialog(props: DetailDialogProps) {
                 {record.limitHit && <span className="tag limit-tag">사용 한도 도달</span>}
               </div>
               <h2>{record.title}</h2>
-              {record.description && <p className="description">{record.description}</p>}
+              {record.description && <Description text={record.description} />}
               {tools.length > 0 && (
                 <div className="tool-row">
                   {tools.map((t) => (
@@ -215,5 +216,43 @@ export function DetailDialog(props: DetailDialogProps) {
         </>
       )}
     </Modal>
+  );
+}
+
+/**
+ * 기록 내용을 보여 주고, 내용 안의 사례 묶음은 표로 바꿉니다.
+ * 상세 화면은 폭이 좁아서 Word처럼 가로 세 칸으로 두지 않고, 사례마다 항목을 머리로 둔 세로 표로 보여 줍니다.
+ */
+function Description({ text }: { text: string }) {
+  return (
+    <div className="description">
+      {splitCases(text).map((part, i) =>
+        part.kind === 'text' ? (
+          <p key={i}>{part.text}</p>
+        ) : (
+          <div key={i} className="case-tables">
+            {part.rows.map((row, j) => (
+              <table key={j} className="case-table">
+                <thead>
+                  <tr>
+                    <th colSpan={2}>{row.item || `사례 ${j + 1}`}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">AI 초안</th>
+                    <td>{row.draft}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">담당자 수정본</th>
+                    <td>{row.revised}</td>
+                  </tr>
+                </tbody>
+              </table>
+            ))}
+          </div>
+        ),
+      )}
+    </div>
   );
 }
