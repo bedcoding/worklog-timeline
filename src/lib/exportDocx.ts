@@ -13,6 +13,7 @@ import {
   TextRun,
   WidthType,
 } from 'docx';
+import { splitCases, type CaseRow } from './cases';
 import { shortDate, weekdayKo } from './dates';
 import { blobToPng, fetchImageBlob, imageSize, type Png } from './images';
 import { buildReport, type ReportLine, type ReportRow } from './report';
@@ -60,6 +61,8 @@ export interface DocxOptions {
   includeForm?: boolean;
   /** 이미지를 내용 아래에 표 폭으로 크게 넣을지. 기본은 왼쪽 칸에 작게 넣고 오른쪽 칸에 내용을 씁니다. */
   imagesBelow?: boolean;
+  /** 기록마다 맨 위에 적는 날짜 줄(예: 9/3 목)을 뺄지. 기본은 넣습니다. */
+  hideDates?: boolean;
   /** 같은 이미지를 여러 번 바꾸지 않도록 미리보기 창이 넘기는 변환 함수 */
   toPng?: (url: string) => Promise<Png>;
   onProgress?: (done: number, total: number) => void;
@@ -83,8 +86,41 @@ function textRuns(text: string, style: { color?: string; size?: number } = {}): 
   return text.split(/\r?\n/).map((line, i) => new TextRun({ text: line, break: i ? 1 : undefined, ...style }));
 }
 
-function cell(children: Paragraph[], width: number, shaded = false, columnSpan?: number): TableCell {
-  return new TableCell({ width: { size: width, type: WidthType.DXA }, margins: CELL_MARGINS, shading: shaded ? GRAY : undefined, columnSpan, children });
+/** Word는 칸이 표로 끝나면 문서가 깨졌다고 보므로, 표로 끝나는 칸에는 빈 문단을 붙입니다 */
+const closed = (children: (Paragraph | Table)[]) => (children[children.length - 1] instanceof Table ? [...children, new Paragraph({})] : children);
+
+function cell(children: (Paragraph | Table)[], width: number, shaded = false, columnSpan?: number): TableCell {
+  return new TableCell({
+    width: { size: width, type: WidthType.DXA },
+    margins: CELL_MARGINS,
+    shading: shaded ? GRAY : undefined,
+    columnSpan,
+    children: closed(children),
+  });
+}
+
+/** 기록 내용 안의 사례 표. 작성 예시처럼 항목, AI 초안, 담당자 수정본을 나란히 두고 머리줄과 항목 칸을 회색으로 칠합니다. */
+function caseTable(rows: CaseRow[], width: number): Table {
+  const itemWidth = Math.round(width * 0.2);
+  const draftWidth = Math.round((width - itemWidth) / 2);
+  const widths = [itemWidth, draftWidth, width - itemWidth - draftWidth];
+  const text = (value: string, bold = false) => [new Paragraph({ spacing: { line: 276 }, children: [new TextRun({ text: value, bold, size: CELL_TEXT })] })];
+  return new Table({
+    width: { size: width, type: WidthType.DXA },
+    columnWidths: widths,
+    layout: TableLayoutType.FIXED,
+    borders: BORDERS,
+    rows: [
+      new TableRow({ cantSplit: true, children: ['항목', 'AI 초안', '담당자 수정본'].map((head, i) => cell(text(head, true), widths[i], true)) }),
+      ...rows.map(
+        (row) =>
+          new TableRow({
+            cantSplit: true,
+            children: [cell(text(row.item, true), widths[0], true), cell(text(row.draft), widths[1]), cell(text(row.revised), widths[2])],
+          }),
+      ),
+    ],
+  });
 }
 
 function lineParagraph(line: ReportLine): Paragraph {
@@ -132,7 +168,7 @@ const headCell = (text: string, width: number) =>
  * 쪽은 줄 사이에서 넘어가므로 이미지가 많아도 한 장이 잘리지 않고, 제목만 쪽 끝에 남지도 않습니다.
  * 한 기록의 줄 사이에는 선을 긋지 않아 한 칸처럼 보입니다.
  */
-function stackedRows(notes: Paragraph[], shots: Paragraph[]): TableRow[] {
+function stackedRows(notes: (Paragraph | Table)[], shots: Paragraph[]): TableRow[] {
   const parts = [[...notes, ...shots.slice(0, 1)], ...shots.slice(1).map((shot) => [shot])];
   return parts.map(
     (children, i) =>
@@ -143,7 +179,7 @@ function stackedRows(notes: Paragraph[], shots: Paragraph[]): TableRow[] {
             width: { size: SHOT_WIDTH + NOTE_WIDTH, type: WidthType.DXA },
             margins: CELL_MARGINS,
             borders: { ...(i > 0 ? { top: NO_BORDER } : {}), ...(i < parts.length - 1 ? { bottom: NO_BORDER } : {}) },
-            children,
+            children: closed(children),
           }),
         ],
       }),
@@ -184,14 +220,17 @@ export async function buildDocxExport(
         reportTable(report.rows),
       ]
     : [];
-  // 기록 표는 새 쪽에서 시작하고, 제목 없이 기간과 건수만 작게 적습니다
-  children.push(
-    new Paragraph({
-      pageBreakBefore: withForm,
-      spacing: { after: 120 },
-      children: [new TextRun({ text: `${report.periodText}, 날짜순 ${list.length}건`, color: MUTED, size: 17 })],
-    }),
-  );
+  // 첫 쪽 본문 뒤의 기록 표는 새 쪽에서 시작하고, 제목 없이 기간과 건수만 작게 적습니다.
+  // 첫 쪽을 빼면 결과물만 따로 내는 문서라서 이 글 없이 표로 바로 시작합니다.
+  if (withForm) {
+    children.push(
+      new Paragraph({
+        pageBreakBefore: true,
+        spacing: { after: 120 },
+        children: [new TextRun({ text: `${report.periodText}, 날짜순 ${list.length}건`, color: MUTED, size: 17 })],
+      }),
+    );
+  }
 
   // 기록마다 한 줄: 왼쪽은 증빙 이미지, 오른쪽은 날짜, 제목, 내용과 효과(앱의 상세 화면과 같은 배치).
   // 이미지가 없으면 두 칸을 합칩니다.
@@ -231,12 +270,20 @@ export async function buildDocxExport(
     }
 
     // 유형과 도구는 첫 쪽 표에 모아 적으므로 기록마다 되풀이하지 않습니다. 사용 한도에 닿은 기록만 표시합니다.
-    const notes: Paragraph[] = [
-      new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `${shortDate(r.date)} ${weekdayKo(r.date)}`, color: MUTED, size: SMALL_TEXT })] }),
+    // 사례 표는 기록 칸 안쪽 폭에 맞춥니다
+    const inner = (below || !shots.length ? SHOT_WIDTH + NOTE_WIDTH : NOTE_WIDTH) - CELL_MARGINS.left - CELL_MARGINS.right;
+    const notes: (Paragraph | Table)[] = [
+      ...(options.hideDates
+        ? []
+        : [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `${shortDate(r.date)} ${weekdayKo(r.date)}`, color: MUTED, size: SMALL_TEXT })] })]),
       new Paragraph({ spacing: { after: 100, line: 288 }, children: [new TextRun({ text: r.title, bold: true, size: 20 })] }),
     ];
     if (r.limitHit) notes.push(new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: '사용 한도 도달', color: MUTED, size: SMALL_TEXT })] }));
-    if (r.description.trim()) notes.push(new Paragraph({ spacing: { after: 100, line: 288 }, children: textRuns(r.description.trim(), { size: CELL_TEXT }) }));
+    // 내용에 "AI 초안:"과 "담당자 수정:" 줄이 짝으로 있으면 그 부분만 사례 표로 바꿉니다
+    for (const part of splitCases(r.description.trim())) {
+      if (part.kind === 'text') notes.push(new Paragraph({ spacing: { after: 100, line: 288 }, children: textRuns(part.text, { size: CELL_TEXT }) }));
+      else notes.push(caseTable(part.rows, inner), new Paragraph({ spacing: { after: 0, line: 200 } }));
+    }
     if (r.effect.trim()) {
       notes.push(
         new Paragraph({

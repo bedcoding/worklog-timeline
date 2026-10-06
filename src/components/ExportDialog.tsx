@@ -89,10 +89,10 @@ const sameSettings = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.st
 
 /**
  * 다 만든 문서가 지금 고른 값으로 만든 것인지 가리는 열쇠.
- * 설정 값(JSON)과 첫 쪽을 넣었는지, 이미지를 내용 아래에 넣었는지로 정합니다.
+ * 설정 값(JSON)과 첫 쪽을 넣었는지, 이미지를 내용 아래에 넣었는지, 날짜를 뺐는지로 정합니다.
  */
-const docKeyOf = (settingsKey: string, withForm: boolean, imagesBelow: boolean) =>
-  `${withForm ? 'report' : 'records'}${imagesBelow ? '+below' : ''}:${settingsKey}`;
+const docKeyOf = (settingsKey: string, withForm: boolean, imagesBelow: boolean, hideDates: boolean) =>
+  `${withForm ? 'report' : 'records'}${imagesBelow ? '+below' : ''}${hideDates ? '+nodate' : ''}:${settingsKey}`;
 
 /** 받을 Word 파일을 만들어 그대로 보여 주고, Word 나 PDF 로 받게 합니다. PDF 도 보여 준 그 문서를 인쇄해 만듭니다. */
 function ExportBody({ records, settings, images, today, onClose, onSaveSettings, onOpenSettings, onCheckRecords }: ExportDialogProps) {
@@ -123,6 +123,9 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   // 이미지를 내용 아래에 크게 넣을지 정합니다.
   // 몇 건을 화면 위주로 자세히 보여 줄 때 쓰고, 창을 열 때마다 왼쪽 칸에 작게 넣는 쪽으로 시작합니다.
   const [imagesBelow, setImagesBelow] = useState(false);
+  // 기록마다 맨 위의 날짜 줄을 뺄지 정합니다.
+  // 결과물만 붙여 넣을 때 쓰고, 창을 열 때마다 날짜를 넣는 쪽으로 시작합니다.
+  const [hideDates, setHideDates] = useState(false);
   // 창을 열 때 체크돼 있던 기록. 창 안에서 체크를 풀어도 목록에 남겨 두어 다시 넣을 수 있게 합니다.
   const [listed] = useState(() => [...records].sort(byDate));
   const included = useMemo(() => new Set(records.map((r) => r.id)), [records]);
@@ -141,7 +144,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   const [committed, setCommitted] = useState<ReportDraft>(draft);
   const effectiveKey = JSON.stringify(applyDraft(settings, committed, auto, autoText));
   const effective = useMemo(() => JSON.parse(effectiveKey) as Settings, [effectiveKey]);
-  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow);
+  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow, hideDates);
   const report = useMemo(() => buildReport(records, effective), [records, effective]);
   const fileName = reportFileName(report, effective, !skipForm);
   const pdfName = fileName.replace(/\.docx$/i, '.pdf');
@@ -233,6 +236,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
           generatedOn: today,
           includeForm: !skipForm,
           imagesBelow,
+          hideDates,
           toPng,
           signal,
           onProgress: (done, total) => {
@@ -253,7 +257,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [records, effective, skipForm, imagesBelow, docKey, images, today]);
+  }, [records, effective, skipForm, imagesBelow, hideDates, docKey, images, today]);
 
   useEffect(() => {
     if (!done) return;
@@ -319,7 +323,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
 
   // 받기를 누른 순간 칸에 보이는 값으로 만든 문서만 받습니다. 아직이면 바로 반영하고 다 만들어지면 받습니다.
   const download = (kind: FileKind) => {
-    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow);
+    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow, hideDates);
     if (ready && ready.key === wanted) {
       void deliver(kind, ready.blob);
       return;
@@ -396,6 +400,10 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
             <label className="check-line export-option">
               <input type="checkbox" checked={imagesBelow} onChange={(e) => setImagesBelow(e.target.checked)} />
               이미지를 내용 아래에 크게
+            </label>
+            <label className="check-line export-option">
+              <input type="checkbox" checked={hideDates} onChange={(e) => setHideDates(e.target.checked)} />
+              기록 날짜 빼기
             </label>
             {!skipForm && !settings.tools.length && !READ_ONLY && (
               <p className="export-callout">

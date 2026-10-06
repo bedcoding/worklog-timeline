@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
+import { shortDate, weekdayKo } from './dates';
 import { buildDocxExport, type DocxOptions } from './exportDocx';
 import type { ImageEntry, Settings, WorkRecord } from './types';
 
@@ -78,10 +79,34 @@ describe('Word 내보내기', () => {
     expect(body).not.toContain('1. 보고서 본문');
     expect(body).not.toContain('홍길동');
     expect(body).not.toContain('w:pageBreakBefore');
-    expect(body).toContain('2026년 3분기(7. 1.~9. 30.), 날짜순 2건');
+    expect(body).not.toContain('날짜순');
     expect(body).toContain('목록 화면 개선');
     expect(body).toContain('날짜 입력 버그 수정');
     expect(core).toContain('업무 기록 (2026년 3분기)');
+  });
+
+  it('날짜를 빼면 기록마다 맨 위의 날짜 줄을 넣지 않는다', async () => {
+    const dateLine = `${shortDate('2026-07-14')} ${weekdayKo('2026-07-14')}`;
+    expect((await build({ includeForm: false })).body).toContain(dateLine);
+    const { body } = await build({ includeForm: false, hideDates: true });
+    expect(body).not.toContain(dateLine);
+    expect(body).toContain('목록 화면 개선');
+    expect(body).toContain('날짜 입력 버그 수정');
+  });
+
+  it('내용의 AI 초안과 담당자 수정 줄은 항목, AI 초안, 담당자 수정본 표로 넣는다', async () => {
+    const description = '초안을 받음.\n\n사례 1. 정렬 기준\nAI 초안: 최신순만 지원했음.\n담당자 수정: 인기순을 추가함.';
+    for (const imagesBelow of [false, true]) {
+      const { body } = await build({ includeForm: false, imagesBelow }, [rec('a', '2026-07-14', '검색 화면 개선', { description })]);
+      expect(body).toContain('담당자 수정본');
+      expect(body).toContain('정렬 기준');
+      expect(body).toContain('인기순을 추가함.');
+      expect(body).not.toContain('사례 1.');
+      expect(body).not.toContain('AI 초안:');
+      expect(body.match(/<w:tbl>/g)).toHaveLength(2);
+      // 칸이 표로 끝나면 Word가 문서를 열지 못하므로 표 뒤에는 늘 문단이 온다
+      expect(body).not.toMatch(/<\/w:tbl>\s*<\/w:tc>/);
+    }
   });
 
   it('이미지를 내용 아래에 넣으면 칸 하나짜리 표에 칸 이름 줄 없이 담는다', async () => {
