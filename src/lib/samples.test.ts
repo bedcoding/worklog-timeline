@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shiftSampleDates } from './samples';
+import { choosePortalView, shiftSampleDates } from './samples';
 import type { WorkRecord } from './types';
 
 const rec = (id: string, date: string): WorkRecord => ({
@@ -30,5 +30,22 @@ describe('예시 기록 날짜 옮기기', () => {
 
   it('기록이 없으면 빈 목록을 돌려준다', () => {
     expect(shiftSampleDates([], '2026-10-06')).toEqual([]);
+  });
+});
+
+describe('읽기 전용 화면에서 예시와 실제 기록 고르기', () => {
+  it('처음 온 사람(주소에도 기억에도 없음)에게는 예시를 보여 주고, 고른 적이 없으니 기억하지 않는다', () => {
+    expect(choosePortalView('', null)).toEqual({ sample: true, remember: null });
+  });
+
+  it('주소의 ?mine 과 ?sample 이 기억보다 먼저이고, 고른 쪽을 기억한다', () => {
+    expect(choosePortalView('?mine', 'sample')).toEqual({ sample: false, remember: 'mine' });
+    expect(choosePortalView('?sample', 'mine')).toEqual({ sample: true, remember: 'sample' });
+  });
+
+  it('주소에 없으면 기억해 둔 쪽을 보여 주고, 알 수 없는 값이면 예시를 보여 준다', () => {
+    expect(choosePortalView('', 'mine')).toEqual({ sample: false, remember: null });
+    expect(choosePortalView('', 'sample')).toEqual({ sample: true, remember: null });
+    expect(choosePortalView('', 'unknown')).toEqual({ sample: true, remember: null });
   });
 });
