@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityCard } from './components/ActivityCard';
 import { DetailDialog } from './components/DetailDialog';
 import { ExportDialog } from './components/ExportDialog';
@@ -29,6 +29,19 @@ import type { RecordDraft, ViewKind } from './lib/types';
 
 type DetailOrigin = 'timeline' | 'list';
 
+/** 마지막에 고른 보기(최근 30일, 월별, 분기별, 연도별)는 이 브라우저에만 기억합니다 */
+const VIEW_KEY = 'worklog-view';
+const VIEWS: readonly ViewKind[] = ['recent', 'month', 'quarter', 'year'];
+
+function savedView(): ViewKind {
+  try {
+    const value = localStorage.getItem(VIEW_KEY);
+    return VIEWS.find((view) => view === value) ?? 'recent';
+  } catch {
+    return 'recent';
+  }
+}
+
 interface FormState {
   mode: 'add' | 'edit';
   recordId?: string;
@@ -39,7 +52,7 @@ export default function App() {
   const store = useWorklog();
   const { toast, show } = useToast();
   const [today] = useState(todayISO);
-  const [period, setPeriod] = useState<Period>(() => periodFor('recent', today));
+  const [period, setPeriod] = useState<Period>(() => periodFor(savedView(), today));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
@@ -51,6 +64,24 @@ export default function App() {
   const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(null);
 
   const { records, images, settings } = store;
+
+  // 기록을 다 불러오면, 기억해 둔 보기로 가장 최근 기록이 든 기간을 보여 줍니다.
+  // 탭을 눌렀을 때와 같은 기간이고, 기록이 없는 오늘의 분기가 먼저 열리지 않게 합니다.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || store.status !== 'ready') return;
+    restored.current = true;
+    const last = records[records.length - 1];
+    if (last) setPeriod((p) => (p.view === 'recent' ? p : periodFor(p.view, last.date)));
+  }, [store.status, records]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, period.view);
+    } catch {
+      // 저장소를 쓸 수 없는 브라우저에서는 기억하지 않습니다
+    }
+  }, [period.view]);
+
   const range = useMemo(() => periodRange(period, today), [period, today]);
   const visible = useMemo(
     () => records.filter((r) => {
