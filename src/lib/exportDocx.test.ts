@@ -132,17 +132,31 @@ describe('Word 내보내기', () => {
     const shots = ['img1', 'img2', 'img3'].map((id) => ({ id, label: '화면 캡처', name: `${id}.png` }));
     const list = [rec('a', '2026-07-14', '목록 화면 개선', { images: shots }), rec('b', '2026-08-07', '날짜 입력 버그 수정')];
     const { body } = await build({ includeForm: false, imagesBelow: true }, list);
-    // 기록 a는 세 줄, 기록 b는 한 줄입니다
+    // 기록 a는 제목 줄과 세 줄, 기록 b는 제목 줄과 한 줄입니다
     const rows = body.split('<w:tr>').slice(1);
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(6);
     expect(rows[0]).toContain('목록 화면 개선');
-    expect(rows[0]).toContain('<w:drawing>');
+    expect(rows[0]).not.toContain('<w:drawing>');
     expect(rows[1]).toContain('<w:drawing>');
     expect(rows[2]).toContain('<w:drawing>');
-    expect(rows[3]).toContain('날짜 입력 버그 수정');
-    // 기록 a의 줄 사이 두 곳만 선을 지웁니다
+    expect(rows[3]).toContain('<w:drawing>');
+    expect(rows[4]).toContain('날짜 입력 버그 수정');
+    // 기록 a의 내용과 이미지 줄 사이 두 곳만 선을 지웁니다
     expect(body.match(/<w:bottom w:val="nil"/g)).toHaveLength(2);
     expect(body.match(/<w:top w:val="nil"/g)).toHaveLength(2);
-    expect(rows[3]).not.toContain('w:val="nil"');
+    expect(rows[4] + rows[5]).not.toContain('w:val="nil"');
+  });
+
+  it('이미지를 내용 아래에 넣으면 날짜와 제목을 회색 제목 줄로 따로 두고, 다음 줄과 같은 쪽에 붙인다', async () => {
+    const day = `${shortDate('2026-07-14')} ${weekdayKo('2026-07-14')}`;
+    const { body } = await build({ includeForm: false, imagesBelow: true });
+    const head = body.split('<w:tr>').slice(1)[0];
+    expect(head).toContain('목록 화면 개선');
+    expect(head).toContain(day);
+    expect(head).not.toContain('목록 화면 개선 설명');
+    expect(head).toContain('w:fill="D9D9D9"');
+    expect(head).toContain('<w:keepNext/>');
+    // 날짜를 빼면 제목 줄에도 날짜가 없다
+    expect((await build({ includeForm: false, imagesBelow: true, hideDates: true })).body).not.toContain(day);
   });
 });

@@ -164,26 +164,32 @@ const headCell = (text: string, width: number) =>
 
 /**
  * 이미지를 내용 아래에 넣는 기록의 줄들입니다.
- * 첫 줄에 날짜, 제목, 내용, 효과와 첫 이미지를 담고, 다음 줄부터 이미지를 한 장씩 담습니다.
- * 쪽은 줄 사이에서 넘어가므로 이미지가 많아도 한 장이 잘리지 않고, 제목만 쪽 끝에 남지도 않습니다.
- * 한 기록의 줄 사이에는 선을 긋지 않아 한 칸처럼 보입니다.
+ * 맨 위 줄에는 날짜와 제목만 담고 회색으로 칠해서, 기록이 어디서 시작하는지 보이게 합니다.
+ * 그다음 줄에 내용, 효과와 첫 이미지를 담고, 그 아래 줄부터 이미지를 한 장씩 담습니다.
+ * 쪽은 줄 사이에서 넘어가므로 이미지가 많아도 한 장이 잘리지 않습니다.
+ * 제목 줄은 다음 줄과 같은 쪽에 붙여 두어 제목만 쪽 끝에 남지 않게 합니다.
+ * 내용과 이미지 줄 사이에는 선을 긋지 않아 한 칸처럼 보입니다.
  */
-function stackedRows(notes: (Paragraph | Table)[], shots: Paragraph[]): TableRow[] {
-  const parts = [[...notes, ...shots.slice(0, 1)], ...shots.slice(1).map((shot) => [shot])];
-  return parts.map(
-    (children, i) =>
-      new TableRow({
-        cantSplit: true,
-        children: [
-          new TableCell({
-            width: { size: SHOT_WIDTH + NOTE_WIDTH, type: WidthType.DXA },
-            margins: CELL_MARGINS,
-            borders: { ...(i > 0 ? { top: NO_BORDER } : {}), ...(i < parts.length - 1 ? { bottom: NO_BORDER } : {}) },
-            children: closed(children),
-          }),
-        ],
-      }),
-  );
+function stackedRows(head: Paragraph, notes: (Paragraph | Table)[], shots: Paragraph[]): TableRow[] {
+  const width = { size: SHOT_WIDTH + NOTE_WIDTH, type: WidthType.DXA };
+  const parts = [[...notes, ...shots.slice(0, 1)], ...shots.slice(1).map((shot) => [shot])].filter((children) => children.length);
+  return [
+    new TableRow({ cantSplit: true, children: [new TableCell({ width, margins: CELL_MARGINS, shading: GRAY, children: [head] })] }),
+    ...parts.map(
+      (children, i) =>
+        new TableRow({
+          cantSplit: true,
+          children: [
+            new TableCell({
+              width,
+              margins: CELL_MARGINS,
+              borders: { ...(i > 0 ? { top: NO_BORDER } : {}), ...(i < parts.length - 1 ? { bottom: NO_BORDER } : {}) },
+              children: closed(children),
+            }),
+          ],
+        }),
+    ),
+  ];
 }
 
 /**
@@ -272,12 +278,14 @@ export async function buildDocxExport(
     // 유형과 도구는 첫 쪽 표에 모아 적으므로 기록마다 되풀이하지 않습니다. 사용 한도에 닿은 기록만 표시합니다.
     // 사례 표는 기록 칸 안쪽 폭에 맞춥니다
     const inner = (below || !shots.length ? SHOT_WIDTH + NOTE_WIDTH : NOTE_WIDTH) - CELL_MARGINS.left - CELL_MARGINS.right;
-    const notes: (Paragraph | Table)[] = [
-      ...(options.hideDates
-        ? []
-        : [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `${shortDate(r.date)} ${weekdayKo(r.date)}`, color: MUTED, size: SMALL_TEXT })] })]),
-      new Paragraph({ spacing: { after: 100, line: 288 }, children: [new TextRun({ text: r.title, bold: true, size: 20 })] }),
-    ];
+    const day = `${shortDate(r.date)} ${weekdayKo(r.date)}`;
+    // 이미지를 내용 아래에 넣을 때는 날짜와 제목을 회색 제목 줄로 따로 뺍니다
+    const notes: (Paragraph | Table)[] = below
+      ? []
+      : [
+          ...(options.hideDates ? [] : [new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: day, color: MUTED, size: SMALL_TEXT })] })]),
+          new Paragraph({ spacing: { after: 100, line: 288 }, children: [new TextRun({ text: r.title, bold: true, size: 20 })] }),
+        ];
     if (r.limitHit) notes.push(new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: '사용 한도 도달', color: MUTED, size: SMALL_TEXT })] }));
     // 내용에 "AI 초안:"과 "담당자 수정:" 줄이 짝으로 있으면 그 부분만 사례 표로 바꿉니다
     for (const part of splitCases(r.description.trim())) {
@@ -293,7 +301,15 @@ export async function buildDocxExport(
       );
     }
     if (below) {
-      rows.push(...stackedRows(notes, shots));
+      const head = new Paragraph({
+        keepNext: true,
+        spacing: { line: 288 },
+        children: [
+          ...(options.hideDates ? [] : [new TextRun({ text: `${day}   `, size: SMALL_TEXT })]),
+          new TextRun({ text: r.title, bold: true, size: 20 }),
+        ],
+      });
+      rows.push(...stackedRows(head, notes, shots));
     } else {
       const cells = shots.length ? [cell(shots, SHOT_WIDTH), cell(notes, NOTE_WIDTH)] : [cell(notes, SHOT_WIDTH + NOTE_WIDTH, false, 2)];
       rows.push(new TableRow({ cantSplit: true, children: cells }));
