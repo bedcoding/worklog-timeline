@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type InputHTMLAttributes } from 'react';
 import { fromDay, mondayOf, shortDate, toDay, weekdayKo } from '../lib/dates';
+import { matchesSearch, searchTerms } from '../lib/search';
 import type { ImageEntry, WorkRecord } from '../lib/types';
 import { WORK_TYPES } from '../lib/workTypes';
 import { IconChevronRight, IconImage } from './Icons';
@@ -32,8 +33,14 @@ function TriCheckbox({ indeterminate, ...rest }: InputHTMLAttributes<HTMLInputEl
 }
 
 export function WeeklyLog(props: WeeklyLogProps) {
-  const { records, periodKey, selectedId, checked, checkedTotal, images, reveal } = props;
+  const { records: periodRecords, periodKey, selectedId, checked, checkedTotal, images, reveal } = props;
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 검색어가 있으면 지금 보는 기간에서 제목, 내용, 효과에 맞는 기록만 보여 줍니다
+  const [query, setQuery] = useState('');
+  const terms = useMemo(() => searchTerms(query), [query]);
+  const searching = terms.length > 0;
+  const records = useMemo(() => periodRecords.filter((r) => matchesSearch(r, terms)), [periodRecords, terms]);
 
   // 월요일 기준 주 묶음, 최근 주가 위로
   const weeks = useMemo(() => {
@@ -47,17 +54,30 @@ export function WeeklyLog(props: WeeklyLogProps) {
     return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([monday, list]) => ({ monday, list: [...list].reverse() }));
   }, [records]);
 
-  // 기간이 바뀌면 최근 두 주만 펼친 상태로 시작합니다
+  // 기간이 바뀌면 최근 두 주만 펼친 상태로 시작합니다.
+  // 검색하는 동안에는 결과가 있는 주를 모두 펼친 상태로 시작합니다.
+  const openKey = searching ? `${periodKey}|${terms.join(' ')}` : periodKey;
   const [openState, setOpenState] = useState<{ key: string; weeks: Set<number> } | null>(null);
-  const opened = openState && openState.key === periodKey ? openState.weeks : new Set(weeks.slice(0, 2).map((w) => w.monday));
+  const opened =
+    openState && openState.key === openKey ? openState.weeks : new Set((searching ? weeks : weeks.slice(0, 2)).map((w) => w.monday));
   const setWeekOpen = (monday: number, value: boolean) => {
     const next = new Set(opened);
     if (value) next.add(monday);
     else next.delete(monday);
-    setOpenState({ key: periodKey, weeks: next });
+    setOpenState({ key: openKey, weeks: next });
   };
+  const allOpen = weeks.length > 0 && weeks.every((w) => opened.has(w.monday));
+  const setAllOpen = (value: boolean) => setOpenState({ key: openKey, weeks: new Set(value ? weeks.map((w) => w.monday) : []) });
 
-  const inPeriod = records.filter((r) => checked.has(r.id)).length;
+  // 체크한 기록 중 이 기간에 든 것과 그중 지금 보이는 것(검색 결과)
+  const inPeriod = periodRecords.filter((r) => checked.has(r.id)).length;
+  const inView = records.filter((r) => checked.has(r.id)).length;
+  const hidden = [
+    checkedTotal > inPeriod ? `다른 기간 ${checkedTotal - inPeriod}개` : '',
+    inPeriod > inView ? `검색 밖 ${inPeriod - inView}개` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
 
   // 상세 화면을 닫으면 그 기록이 들어 있는 주를 펼치고 행으로 포커스를 돌려줍니다
   useEffect(() => {
@@ -81,20 +101,42 @@ export function WeeklyLog(props: WeeklyLogProps) {
           <h2 id="weekly-heading">주간 기록</h2>
           <p>최근 기록부터 둘러보세요. 결과물을 누르면 상세 화면이 열립니다.</p>
         </div>
-        <span className="log-count">{weeks.length}주에 걸친 기록</span>
+        <div className="log-tools">
+          <input
+            type="search"
+            className="log-search"
+            value={query}
+            placeholder="이 기간에서 검색"
+            aria-label="이 기간 기록 검색"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setQuery('');
+            }}
+          />
+          <div className="log-meta">
+            <span className={`log-count${searching ? ' is-search' : ''}`} aria-live="polite">
+              {searching ? `검색 결과 ${records.length}개` : `${weeks.length}주에 걸친 기록`}
+            </span>
+            {weeks.length > 1 && (
+              <button type="button" className="text-button log-toggle" onClick={() => setAllOpen(!allOpen)}>
+                {allOpen ? '모두 접기' : '모두 펼치기'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
       <div className="bulk-toolbar">
         <label className="bulk-check">
           <TriCheckbox
-            indeterminate={inPeriod > 0 && inPeriod < records.length}
+            indeterminate={inView > 0 && inView < records.length}
             disabled={!records.length}
-            checked={records.length > 0 && inPeriod === records.length}
+            checked={records.length > 0 && inView === records.length}
             onChange={(e) => props.onToggleMany(records.map((r) => r.id), e.target.checked)}
           />
-          이 기간 모두 선택
+          {searching ? '검색 결과 모두 선택' : '이 기간 모두 선택'}
         </label>
         <span id="selection-count" aria-live="polite">
-          선택 {checkedTotal}개{checkedTotal > inPeriod ? ` (다른 기간 ${checkedTotal - inPeriod}개 포함)` : ''}
+          선택 {checkedTotal}개{hidden ? ` (${hidden} 포함)` : ''}
         </span>
         <button type="button" className="btn danger" disabled={!checkedTotal} onClick={props.onDeleteChecked}>
           선택 삭제
@@ -132,7 +174,7 @@ export function WeeklyLog(props: WeeklyLogProps) {
                   >
                     <span className="week-range">{range}</span>
                     <span className="week-meta">기록 {week.list.length}개</span>
-                    {index === 0 && <span className="week-last">최근 기록</span>}
+                    {index === 0 && !searching && <span className="week-last">최근 기록</span>}
                     <span className="week-chevron" aria-hidden="true">
                       <IconChevronRight />
                     </span>
@@ -156,6 +198,13 @@ export function WeeklyLog(props: WeeklyLogProps) {
               </div>
             );
           })
+        ) : searching ? (
+          <div className="log-empty">
+            이 기간에는 &ldquo;{query.trim()}&rdquo;에 맞는 기록이 없어요.{' '}
+            <button type="button" className="text-button inline" onClick={() => setQuery('')}>
+              검색 지우기
+            </button>
+          </div>
         ) : (
           <div className="log-empty">
             이 기간에는 기록이 없어요.{' '}
