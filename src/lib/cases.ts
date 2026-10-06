@@ -56,3 +56,31 @@ export function splitCases(text: string): DescriptionPart[] {
   flush();
   return parts;
 }
+
+/**
+ * 기록 내용을 입력 화면의 내용 칸과 사례 칸으로 나눕니다.
+ * 사례 묶음이 하나이고 내용 맨 끝에 있을 때만 나눕니다.
+ * 그 밖의 모양이면 쓴 글을 그대로 내용 칸에 두어 순서가 바뀌지 않게 합니다.
+ */
+export function splitDescription(text: string): { body: string; cases: CaseRow[] } {
+  const parts = splitCases(text.trim());
+  const last = parts[parts.length - 1];
+  if (last?.kind !== 'cases' || parts.filter((p) => p.kind === 'cases').length !== 1) return { body: text.trim(), cases: [] };
+  const body = parts.flatMap((p) => (p.kind === 'text' ? [p.text] : [])).join('\n\n');
+  return { body, cases: last.rows };
+}
+
+/**
+ * 내용 칸과 사례 칸을 저장할 기록 내용 한 덩어리로 합칩니다.
+ * 사례는 번호와 항목 줄, AI 초안 줄, 담당자 수정 줄의 세 줄로 쓰고 사례 사이는 빈 줄로 띄웁니다.
+ * 세 칸이 모두 빈 사례는 빼고, 사례 안의 줄바꿈은 표 한 칸에 들어가도록 띄어쓰기로 바꿉니다.
+ * 항목이 비면 "사례 1"처럼 번호만 써서 앞의 글이 항목으로 잘못 들어가지 않게 합니다.
+ */
+export function joinDescription(body: string, cases: readonly CaseRow[]): string {
+  const oneLine = (value: string) => value.replace(/\s*\n\s*/g, ' ').trim();
+  const blocks = cases
+    .map((c) => ({ item: oneLine(c.item).replace(NUMBER, '').replace(/[.。]+$/, ''), draft: oneLine(c.draft), revised: oneLine(c.revised) }))
+    .filter((c) => c.item || c.draft || c.revised)
+    .map((c, i) => [c.item ? `사례 ${i + 1}. ${c.item}` : `사례 ${i + 1}`, `AI 초안: ${c.draft}`, `담당자 수정: ${c.revised}`].join('\n'));
+  return [body.trim(), ...blocks].filter(Boolean).join('\n\n');
+}

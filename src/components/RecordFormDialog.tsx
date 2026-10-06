@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { joinDescription, splitDescription } from '../lib/cases';
 import { isValidISO } from '../lib/dates';
 import { ACCEPT_ATTR, hasFiles, imagesFromClipboard, imagesFromDrop } from '../lib/images';
 import type { ImageEntry, RecordDraft, Settings, WorkRecord, WorkType } from '../lib/types';
@@ -53,7 +54,12 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
   const [type, setType] = useState<WorkType>(record?.type ?? 'dev');
   const [toolIds, setToolIds] = useState<string[]>(record?.toolIds ?? (settings.tools[0] ? [settings.tools[0].id] : []));
   const [title, setTitle] = useState(record?.title ?? '');
-  const [description, setDescription] = useState(record?.description ?? '');
+  // 내용 끝의 사례 묶음은 사례 칸으로 꺼내 보여 주고, 저장할 때 다시 내용 끝에 붙입니다
+  const [initial] = useState(() => splitDescription(record?.description ?? ''));
+  const [description, setDescription] = useState(initial.body);
+  const [cases, setCases] = useState(() => initial.cases.map((c) => ({ ...c, key: uid() })));
+  // 방금 추가한 사례의 항목 칸에만 포커스를 줍니다
+  const [focusKey, setFocusKey] = useState<string | null>(null);
   const [effect, setEffect] = useState(record?.effect ?? '');
   const [limitHit, setLimitHit] = useState(record?.limitHit ?? false);
   const [removed, setRemoved] = useState<string[]>([]);
@@ -73,6 +79,14 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
   };
   const removePending = (key: string) => setPending((list) => list.filter((p) => p.key !== key));
   const toggleTool = (id: string) => setToolIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const addCase = () => {
+    const key = uid();
+    setCases((list) => [...list, { key, item: '', draft: '', revised: '' }]);
+    setFocusKey(key);
+  };
+  const editCase = (key: string, field: 'item' | 'draft' | 'revised', value: string) =>
+    setCases((list) => list.map((c) => (c.key === key ? { ...c, [field]: value } : c)));
+  const removeCase = (key: string) => setCases((list) => list.filter((c) => c.key !== key));
 
   const existing = (record?.images ?? []).filter((img) => !removed.includes(img.id));
 
@@ -92,7 +106,7 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
     setError('');
     try {
       await onSubmit(
-        { date, type, toolIds, title: cleanTitle, description: description.trim(), effect: effect.trim(), limitHit },
+        { date, type, toolIds, title: cleanTitle, description: joinDescription(description, cases), effect: effect.trim(), limitHit },
         pending.map((p) => p.file),
         removed,
       );
@@ -181,6 +195,58 @@ function RecordForm({ mode, record, initialFiles, defaultDate, settings, images,
             onChange={(e) => setDescription(e.target.value)}
           />
         </label>
+        <div className="field wide">
+          <span className="field-label">AI 초안과 담당자 수정 (선택)</span>
+          {cases.length > 0 && (
+            <div className="case-list">
+              {cases.map((c, i) => (
+                <div key={c.key} className="case-card" role="group" aria-label={`사례 ${i + 1}`}>
+                  <div className="case-head">
+                    <span>사례 {i + 1}</span>
+                    <button type="button" className="text-button" aria-label={`사례 ${i + 1} 빼기`} onClick={() => removeCase(c.key)}>
+                      빼기
+                    </button>
+                  </div>
+                  <input
+                    className="case-item"
+                    value={c.item}
+                    maxLength={40}
+                    autoFocus={c.key === focusKey}
+                    placeholder="항목 (예: 정렬 기준)"
+                    aria-label={`사례 ${i + 1} 항목`}
+                    onChange={(e) => editCase(c.key, 'item', e.target.value)}
+                  />
+                  <label className="case-field">
+                    AI 초안
+                    <textarea
+                      value={c.draft}
+                      maxLength={300}
+                      placeholder="AI가 처음 만든 것"
+                      aria-label={`사례 ${i + 1} AI 초안`}
+                      onChange={(e) => editCase(c.key, 'draft', e.target.value)}
+                    />
+                  </label>
+                  <label className="case-field">
+                    담당자 수정
+                    <textarea
+                      value={c.revised}
+                      maxLength={300}
+                      placeholder="검토해서 고친 것"
+                      aria-label={`사례 ${i + 1} 담당자 수정`}
+                      onChange={(e) => editCase(c.key, 'revised', e.target.value)}
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="field-hint">
+            <button type="button" className="text-button inline" onClick={addCase}>
+              사례 추가
+            </button>{' '}
+            Word와 PDF에서 &ldquo;항목 | AI 초안 | 담당자 수정본&rdquo; 표로 들어가요.
+          </p>
+        </div>
         <label className="field wide">
           효과와 메모
           <textarea

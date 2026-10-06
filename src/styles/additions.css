@@ -432,6 +432,49 @@ dialog:focus {
   font-weight: 400;
   color: var(--muted);
 }
+/* 사례 칸: 항목 아래에 AI 초안과 담당자 수정을 나란히 적고, 내보내면 표 한 줄이 됩니다 */
+.case-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.case-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f4f6ef;
+}
+.case-head,
+.case-card .case-item {
+  grid-column: 1 / -1;
+}
+.case-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+}
+.case-head .text-button {
+  padding: 0;
+}
+.case-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.case-field textarea {
+  min-height: 64px;
+}
+@media (max-width: 760px) {
+  .case-card {
+    grid-template-columns: 1fr;
+  }
+}
 .tool-picker {
   display: flex;
   flex-wrap: wrap;
