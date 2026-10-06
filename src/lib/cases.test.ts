@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { joinDescription, splitCases, splitDescription } from './cases';
+import type { WorkRecord } from './types';
 
 describe('사례 나누기', () => {
   it('사례가 없으면 글 하나로 돌려준다', () => {
@@ -78,6 +79,12 @@ describe('입력 화면의 내용 칸과 사례 칸', () => {
       { item: '사례 3. 정렬 기준.', draft: '최신순만\n지원했음.', revised: '인기순 추가' },
     ]);
     expect(text).toBe('개요.\n\n사례 1. 정렬 기준\nAI 초안: 최신순만 지원했음.\n담당자 수정: 인기순 추가');
+  });
+
+  it('예시 기록은 모두 사례를 담고 있어서, 처음 쓰는 사람이 내보내 보면 사례 표가 보인다', () => {
+    const samples = Object.values(import.meta.glob<WorkRecord>('../../data-sample/records/*/record.json', { eager: true, import: 'default' }));
+    expect(samples.length).toBeGreaterThan(0);
+    for (const r of samples) expect(splitDescription(r.description).cases.length).toBeGreaterThan(0);
   });
 
   it('항목이 비면 번호만 써서 표의 항목 칸을 비우고, 앞의 글을 항목으로 가져가지 않는다', () => {
