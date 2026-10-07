@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { plainRecord, splitCases } from '../lib/cases';
+import { hasCases, plainRecord, splitCases } from '../lib/cases';
 import { dottedDate, weekdayEn } from '../lib/dates';
 import { ACCEPT_ATTR, hasFiles, imagesFromClipboard, imagesFromDrop } from '../lib/images';
 import { READ_ONLY } from '../lib/mode';
@@ -37,7 +37,10 @@ export function DetailDialog(props: DetailDialogProps) {
   useEffect(() => {
     if (!open) setPlainView(false);
   }, [open]);
-  const view = record && (plainView ? plainRecord(record) : record);
+  // 사례 표가 없는 기록은 버전을 고르는 칸을 숨기고 표 있는 버전의 글을 그대로 보여 줍니다.
+  // 고른 쪽은 기억해 두었다가 표가 있는 기록으로 넘어가면 다시 씁니다.
+  const versions = !!record && hasCases(record.description);
+  const view = record && (plainView && versions ? plainRecord(record) : record);
 
   const refs = record?.images ?? [];
   const index = Math.min(imageIndex, Math.max(0, refs.length - 1));
@@ -80,14 +83,16 @@ export function DetailDialog(props: DetailDialogProps) {
           <div className="modal-toolbar">
             <div className="modal-heading">
               <h2 id="work-dialog-title">작업 기록 상세</h2>
-              <div className="range-tabs" role="group" aria-label="내용 버전">
-                <button type="button" className="range-tab" aria-pressed={!plainView} onClick={() => setPlainView(false)}>
-                  표 있는 버전
-                </button>
-                <button type="button" className="range-tab" aria-pressed={plainView} onClick={() => setPlainView(true)}>
-                  표 없는 버전
-                </button>
-              </div>
+              {versions && (
+                <div className="range-tabs" role="group" aria-label="내용 버전">
+                  <button type="button" className="range-tab" aria-pressed={!plainView} onClick={() => setPlainView(false)}>
+                    표 있는 버전
+                  </button>
+                  <button type="button" className="range-tab" aria-pressed={plainView} onClick={() => setPlainView(true)}>
+                    표 없는 버전
+                  </button>
+                </div>
+              )}
             </div>
             <div className="modal-actions">
               {!READ_ONLY && (

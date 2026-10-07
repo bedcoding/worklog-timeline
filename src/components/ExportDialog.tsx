@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { plainRecord } from '../lib/cases';
+import { hasCases, plainRecord } from '../lib/cases';
 import { downloadBlob } from '../lib/download';
 import type { Png } from '../lib/images';
 import { READ_ONLY } from '../lib/mode';
@@ -133,8 +133,12 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   // 창을 열 때 체크돼 있던 기록. 창 안에서 체크를 풀어도 목록에 남겨 두어 다시 넣을 수 있게 합니다.
   const [listed] = useState(() => [...records].sort(byDate));
   const included = useMemo(() => new Set(records.map((r) => r.id)), [records]);
+  // 고른 기록에 사례 표가 하나도 없으면 "표 없는 버전으로"를 숨기고, 체크해 둔 값도 쓰지 않습니다.
+  // 표가 있는 기록을 다시 고르면 체크해 둔 값으로 돌아갑니다.
+  const anyCases = useMemo(() => records.some((r) => hasCases(r.description)), [records]);
+  const plainInUse = plainVersion && anyCases;
   // 문서에 넣는 기록. 표 없는 버전을 고르면 기록마다 그 버전의 제목, 내용, 효과로 바꿉니다.
-  const shown = useMemo(() => (plainVersion ? records.map(plainRecord) : records), [records, plainVersion]);
+  const shown = useMemo(() => (plainInUse ? records.map(plainRecord) : records), [records, plainInUse]);
 
   // 보고 분기는 기록 날짜로 정하고, 고쳐 쓴 값은 그 기간 글을 열쇠로 저장합니다
   const base = useMemo(() => buildReport(shown, settings), [shown, settings]);
@@ -150,7 +154,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
   const [committed, setCommitted] = useState<ReportDraft>(draft);
   const effectiveKey = JSON.stringify(applyDraft(settings, committed, auto, autoText));
   const effective = useMemo(() => JSON.parse(effectiveKey) as Settings, [effectiveKey]);
-  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow, hideDates, plainVersion);
+  const docKey = docKeyOf(effectiveKey, !skipForm, imagesBelow, hideDates, plainInUse);
   const report = useMemo(() => buildReport(shown, effective), [shown, effective]);
   const fileName = reportFileName(report, effective, !skipForm);
   const pdfName = fileName.replace(/\.docx$/i, '.pdf');
@@ -329,7 +333,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
 
   // 받기를 누른 순간 칸에 보이는 값으로 만든 문서만 받습니다. 아직이면 바로 반영하고 다 만들어지면 받습니다.
   const download = (kind: FileKind) => {
-    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow, hideDates, plainVersion);
+    const wanted = docKeyOf(JSON.stringify(applyDraft(settings, draft, auto, autoText)), !skipForm, imagesBelow, hideDates, plainInUse);
     if (ready && ready.key === wanted) {
       void deliver(kind, ready.blob);
       return;
@@ -403,10 +407,12 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
               <input type="checkbox" checked={skipForm} onChange={(e) => setSkipForm(e.target.checked)} />
               1쪽 보고서 본문 빼기
             </label>
-            <label className="check-line export-option">
-              <input type="checkbox" checked={plainVersion} onChange={(e) => setPlainVersion(e.target.checked)} />
-              표 없는 버전으로
-            </label>
+            {anyCases && (
+              <label className="check-line export-option">
+                <input type="checkbox" checked={plainVersion} onChange={(e) => setPlainVersion(e.target.checked)} />
+                표 없는 버전으로
+              </label>
+            )}
             <label className="check-line export-option">
               <input type="checkbox" checked={imagesBelow} onChange={(e) => setImagesBelow(e.target.checked)} />
               이미지를 내용 아래에 크게
@@ -477,7 +483,7 @@ function ExportBody({ records, settings, images, today, onClose, onSaveSettings,
               </div>
               <ul className="export-records" role="group" aria-labelledby={`${id}-records`}>
                 {listed.map((r) => {
-                  const title = plainVersion ? plainRecord(r).title : r.title;
+                  const title = plainInUse ? plainRecord(r).title : r.title;
                   return (
                     <li key={r.id}>
                       <label className={`check-line${included.has(r.id) ? '' : ' is-off'}`} title={title}>

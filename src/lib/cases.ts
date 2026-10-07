@@ -87,6 +87,14 @@ export function joinDescription(body: string, cases: readonly CaseRow[]): string
   return [body.trim(), ...blocks].filter(Boolean).join('\n\n');
 }
 
+/**
+ * 기록 내용에 사례 표가 하나라도 있는지 알려 줍니다.
+ * 표가 없는 기록에는 표 있는 버전과 없는 버전을 고르는 칸을 보여 주지 않습니다.
+ */
+export function hasCases(text: string): boolean {
+  return splitCases(text).some((p) => p.kind === 'cases');
+}
+
 /** 기록 내용에서 사례 묶음을 빼고 글만 남깁니다 */
 export function withoutCases(text: string): string {
   const parts = splitCases(text);

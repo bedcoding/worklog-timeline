@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { joinDescription, plainRecord, splitCases, splitDescription, withoutCases } from './cases';
+import { hasCases, joinDescription, plainRecord, splitCases, splitDescription, withoutCases } from './cases';
 import type { WorkRecord } from './types';
 
 describe('사례 나누기', () => {
@@ -112,6 +112,13 @@ describe('표 없는 버전', () => {
     createdAt: 1,
     updatedAt: 1,
     ...patch,
+  });
+
+  it('AI 초안 줄과 담당자 수정 줄이 짝을 이뤄야 사례 표가 있다고 본다', () => {
+    expect(hasCases(withCases)).toBe(true);
+    expect(hasCases('사례 없는 글.\n둘째 줄.')).toBe(false);
+    expect(hasCases('AI 초안: 짝이 없는 줄.')).toBe(false);
+    expect(hasCases('')).toBe(false);
   });
 
   it('사례 묶음을 빼고 글만 남긴다', () => {
