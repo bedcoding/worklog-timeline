@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type InputHTMLAttributes } from 'react';
 import { splitDescription } from '../lib/cases';
-import { fromDay, mondayOf, shortDate, toDay, weekdayKo } from '../lib/dates';
+import { groupLabel, groupStartOf, shortDate, toDay, weekdayKo, type ListUnit } from '../lib/dates';
 import { READ_ONLY } from '../lib/mode';
 import { matchesSearch, searchTerms } from '../lib/search';
 import type { ImageEntry, WorkRecord } from '../lib/types';
@@ -9,6 +9,8 @@ import { IconChevronRight, IconImage } from './Icons';
 
 interface WeeklyLogProps {
   records: WorkRecord[];
+  /** 주마다 묶을지 달마다 묶을지. 분기별과 연도별 보기는 달마다 묶습니다. */
+  unit: ListUnit;
   periodKey: string;
   selectedId: string | null;
   checked: Set<string>;
@@ -37,7 +39,7 @@ function TriCheckbox({ indeterminate, ...rest }: InputHTMLAttributes<HTMLInputEl
 }
 
 export function WeeklyLog(props: WeeklyLogProps) {
-  const { records: periodRecords, periodKey, selectedId, checked, checkedTotal, images, reveal } = props;
+  const { records: periodRecords, unit, periodKey, selectedId, checked, checkedTotal, images, reveal } = props;
   const listRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -48,32 +50,34 @@ export function WeeklyLog(props: WeeklyLogProps) {
   const searching = terms.length > 0;
   const records = useMemo(() => periodRecords.filter((r) => matchesSearch(r, terms)), [periodRecords, terms]);
 
-  // 월요일 기준 주 묶음, 최근 주가 위로
-  const weeks = useMemo(() => {
-    const groups = new Map<number, WorkRecord[]>();
+  // 주(월요일부터)나 달 묶음, 최근 묶음이 위로
+  const groups = useMemo(() => {
+    const map = new Map<number, WorkRecord[]>();
     for (const r of records) {
-      const monday = mondayOf(toDay(r.date));
-      const list = groups.get(monday) ?? [];
+      const start = groupStartOf(toDay(r.date), unit);
+      const list = map.get(start) ?? [];
       list.push(r);
-      groups.set(monday, list);
+      map.set(start, list);
     }
-    return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([monday, list]) => ({ monday, list: [...list].reverse() }));
-  }, [records]);
+    return [...map.entries()].sort((a, b) => b[0] - a[0]).map(([start, list]) => ({ start, list: [...list].reverse() }));
+  }, [records, unit]);
 
-  // 기간이 바뀌면 최근 두 주만 펼친 상태로 시작합니다.
-  // 검색하는 동안에는 결과가 있는 주를 모두 펼친 상태로 시작합니다.
+  // 기간이 바뀌면 최근 두 주(달로 묶을 때는 최근 석 달)만 펼친 상태로 시작합니다.
+  // 검색하는 동안에는 결과가 있는 묶음을 모두 펼친 상태로 시작합니다.
   const openKey = searching ? `${periodKey}|${terms.join(' ')}` : periodKey;
-  const [openState, setOpenState] = useState<{ key: string; weeks: Set<number> } | null>(null);
+  const [openState, setOpenState] = useState<{ key: string; groups: Set<number> } | null>(null);
   const opened =
-    openState && openState.key === openKey ? openState.weeks : new Set((searching ? weeks : weeks.slice(0, 2)).map((w) => w.monday));
-  const setWeekOpen = (monday: number, value: boolean) => {
+    openState && openState.key === openKey
+      ? openState.groups
+      : new Set((searching ? groups : groups.slice(0, unit === 'month' ? 3 : 2)).map((g) => g.start));
+  const setGroupOpen = (start: number, value: boolean) => {
     const next = new Set(opened);
-    if (value) next.add(monday);
-    else next.delete(monday);
-    setOpenState({ key: openKey, weeks: next });
+    if (value) next.add(start);
+    else next.delete(start);
+    setOpenState({ key: openKey, groups: next });
   };
-  const allOpen = weeks.length > 0 && weeks.every((w) => opened.has(w.monday));
-  const setAllOpen = (value: boolean) => setOpenState({ key: openKey, weeks: new Set(value ? weeks.map((w) => w.monday) : []) });
+  const allOpen = groups.length > 0 && groups.every((g) => opened.has(g.start));
+  const setAllOpen = (value: boolean) => setOpenState({ key: openKey, groups: new Set(value ? groups.map((g) => g.start) : []) });
 
   // 체크한 기록 중 이 기간에 든 것과 그중 지금 보이는 것(검색 결과)
   const inPeriod = periodRecords.filter((r) => checked.has(r.id)).length;
@@ -85,13 +89,13 @@ export function WeeklyLog(props: WeeklyLogProps) {
     .filter(Boolean)
     .join(', ');
 
-  // 상세 화면을 닫으면 그 기록이 들어 있는 주를 펼치고 행으로 포커스를 돌려줍니다
+  // 상세 화면을 닫으면 그 기록이 들어 있는 묶음을 펼치고 행으로 포커스를 돌려줍니다
   useEffect(() => {
     if (!reveal) return;
     const record = records.find((r) => r.id === reveal.id);
     if (!record) return;
-    const monday = mondayOf(toDay(record.date));
-    if (!opened.has(monday)) setWeekOpen(monday, true);
+    const start = groupStartOf(toDay(record.date), unit);
+    if (!opened.has(start)) setGroupOpen(start, true);
     requestAnimationFrame(() => {
       const el = listRef.current?.querySelector<HTMLButtonElement>(`.row-main[data-open="${reveal.id}"]`);
       el?.focus({ preventScroll: true });
@@ -113,7 +117,7 @@ export function WeeklyLog(props: WeeklyLogProps) {
     <section className="log-section" aria-labelledby="weekly-heading">
       <div className="log-heading">
         <div>
-          <h2 id="weekly-heading">주간 기록</h2>
+          <h2 id="weekly-heading">{unit === 'month' ? '월별 기록' : '주간 기록'}</h2>
           <p>최근 기록부터 둘러보세요. 결과물을 누르면 상세 화면이 열립니다.</p>
         </div>
         <div className="log-tools">
@@ -152,7 +156,7 @@ export function WeeklyLog(props: WeeklyLogProps) {
             </button>
           )}
         </span>
-        {weeks.length > 1 && (
+        {groups.length > 1 && (
           <button type="button" className="text-button log-toggle" onClick={() => setAllOpen(!allOpen)}>
             {allOpen ? '모두 접기' : '모두 펼치기'}
           </button>
@@ -169,16 +173,16 @@ export function WeeklyLog(props: WeeklyLogProps) {
         </div>
       </div>
       <div ref={listRef}>
-        {weeks.length ? (
-          weeks.map((week, index) => {
-            const isOpen = opened.has(week.monday);
-            const ids = week.list.map((r) => r.id);
+        {groups.length ? (
+          groups.map((group, index) => {
+            const isOpen = opened.has(group.start);
+            const ids = group.list.map((r) => r.id);
             const picked = ids.filter((id) => checked.has(id)).length;
-            const range = `${shortDate(fromDay(week.monday))} ~ ${shortDate(fromDay(week.monday + 6))}`;
-            const rowsId = `week-rows-${week.monday}`;
+            const range = groupLabel(group.start, unit);
+            const rowsId = `week-rows-${group.start}`;
             return (
-              <div key={week.monday} className={`week${isOpen ? ' is-open' : ''}`}>
-                {/* 왼쪽 체크는 그 주 기록을 한꺼번에 고르고, 나머지 머리 부분을 누르면 펼치고 접습니다 */}
+              <div key={group.start} className={`week${isOpen ? ' is-open' : ''}`}>
+                {/* 왼쪽 체크는 그 묶음의 기록을 한꺼번에 고르고, 나머지 머리 부분을 누르면 펼치고 접습니다 */}
                 <div className="week-head">
                   <label className="week-check">
                     <TriCheckbox
@@ -193,10 +197,10 @@ export function WeeklyLog(props: WeeklyLogProps) {
                     className="week-summary"
                     aria-expanded={isOpen}
                     aria-controls={isOpen ? rowsId : undefined}
-                    onClick={() => setWeekOpen(week.monday, !isOpen)}
+                    onClick={() => setGroupOpen(group.start, !isOpen)}
                   >
                     <span className="week-range">{range}</span>
-                    <span className="week-meta">기록 {week.list.length}개</span>
+                    <span className="week-meta">기록 {group.list.length}개</span>
                     {index === 0 && !searching && <span className="week-last">최근 기록</span>}
                     <span className="week-chevron" aria-hidden="true">
                       <IconChevronRight />
@@ -205,7 +209,7 @@ export function WeeklyLog(props: WeeklyLogProps) {
                 </div>
                 {isOpen && (
                   <div className="week-rows" id={rowsId}>
-                    {week.list.map((r) => (
+                    {group.list.map((r) => (
                       <WorkRow
                         key={r.id}
                         record={r}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { choosePortalView, shiftSampleDates } from './samples';
+import { choosePortalView, defaultView, shiftSampleDates } from './samples';
 import type { WorkRecord } from './types';
 
 const rec = (id: string, date: string): WorkRecord => ({
@@ -30,6 +30,17 @@ describe('예시 기록 날짜 옮기기', () => {
 
   it('기록이 없으면 빈 목록을 돌려준다', () => {
     expect(shiftSampleDates([], '2026-10-06')).toEqual([]);
+  });
+});
+
+describe('처음 여는 보기', () => {
+  it('실제 기록이 하나라도 있거나 기록이 없으면 분기별로 연다', () => {
+    expect(defaultView([rec('a', '2026-09-01'), { ...rec('b', '2026-09-02'), sample: false }])).toBe('quarter');
+    expect(defaultView([])).toBe('quarter');
+  });
+
+  it('예시 기록만 있으면 최근 30일로 연다', () => {
+    expect(defaultView([rec('a', '2026-09-01'), rec('b', '2026-10-04')])).toBe('recent');
   });
 });
 

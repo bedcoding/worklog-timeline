@@ -12,6 +12,7 @@ import { useToast } from './hooks/useToast';
 import { useWorklog } from './hooks/useWorklog';
 import { READ_ONLY, SAMPLE_VIEW } from './lib/mode';
 import {
+  listUnitFor,
   monthOf,
   periodFor,
   periodLabel,
@@ -26,20 +27,33 @@ import {
 } from './lib/dates';
 import { downloadBlob, fileStamp } from './lib/download';
 import { imagesFromClipboard } from './lib/images';
+import { defaultView } from './lib/samples';
 import type { RecordDraft, ViewKind } from './lib/types';
 
 type DetailOrigin = 'timeline' | 'list';
 
-/** 마지막에 고른 보기(최근 30일, 월별, 분기별, 연도별)는 이 브라우저에만 기억합니다 */
+/**
+ * 마지막에 누른 보기 탭(최근 30일, 월별, 분기별, 연도별)은 이 브라우저에만 기억합니다.
+ * 날짜를 골라 월별로 넘어간 것처럼 탭을 누르지 않고 바뀐 보기는 기억하지 않습니다.
+ */
 const VIEW_KEY = 'worklog-view';
 const VIEWS: readonly ViewKind[] = ['recent', 'month', 'quarter', 'year'];
 
-function savedView(): ViewKind {
+/** 기억해 둔 보기. 탭을 누른 적이 없으면 null */
+function savedView(): ViewKind | null {
   try {
     const value = localStorage.getItem(VIEW_KEY);
-    return VIEWS.find((view) => view === value) ?? 'recent';
+    return VIEWS.find((view) => view === value) ?? null;
   } catch {
-    return 'recent';
+    return null;
+  }
+}
+
+function saveView(view: ViewKind): void {
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // 저장소를 쓸 수 없는 브라우저에서는 기억하지 않습니다
   }
 }
 
@@ -53,7 +67,7 @@ export default function App() {
   const store = useWorklog();
   const { toast, show } = useToast();
   const [today] = useState(todayISO);
-  const [period, setPeriod] = useState<Period>(() => periodFor(savedView(), today));
+  const [period, setPeriod] = useState<Period>(() => periodFor(savedView() ?? 'quarter', today));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
@@ -66,22 +80,16 @@ export default function App() {
 
   const { records, images, settings } = store;
 
-  // 기록을 다 불러오면, 기억해 둔 보기로 가장 최근 기록이 든 기간을 보여 줍니다.
+  // 기록을 다 불러오면, 기억해 둔 보기(없으면 처음 여는 보기)로 가장 최근 기록이 든 기간을 보여 줍니다.
   // 탭을 눌렀을 때와 같은 기간이고, 기록이 없는 오늘의 분기가 먼저 열리지 않게 합니다.
   const restored = useRef(false);
   useEffect(() => {
     if (restored.current || store.status !== 'ready') return;
     restored.current = true;
+    const view = savedView() ?? defaultView(records);
     const last = records[records.length - 1];
-    if (last) setPeriod((p) => (p.view === 'recent' ? p : periodFor(p.view, last.date)));
-  }, [store.status, records]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_KEY, period.view);
-    } catch {
-      // 저장소를 쓸 수 없는 브라우저에서는 기억하지 않습니다
-    }
-  }, [period.view]);
+    setPeriod(view === 'recent' || !last ? periodFor(view, today) : periodFor(view, last.date));
+  }, [store.status, records, today]);
 
   const range = useMemo(() => periodRange(period, today), [period, today]);
   const visible = useMemo(
@@ -180,6 +188,7 @@ export default function App() {
   const setView = (view: ViewKind) => {
     const anchor = selected?.date ?? today;
     setPeriod({ view, year: yearOf(anchor), month: monthOf(anchor), quarter: quarterOfMonth(monthOf(anchor)) });
+    saveView(view);
   };
 
   const pickDate = (date: string) => {
@@ -397,6 +406,7 @@ export default function App() {
         />
         <WeeklyLog
           records={visible}
+          unit={listUnitFor(period.view)}
           periodKey={periodKey}
           selectedId={selected?.id ?? null}
           checked={checked}
@@ -417,7 +427,7 @@ export default function App() {
               SAMPLE_VIEW ? (
                 '예시 기록을 보는 중입니다. 기록을 체크하고 선택 내보내기를 누르면 사례 표가 들어간 Word를 받아 볼 수 있어요.'
               ) : (
-                '읽기 전용 화면입니다. 주간 기록에서 기록을 체크하고 선택 내보내기를 누르면 Word나 PDF로 받을 수 있어요.'
+                '읽기 전용 화면입니다. 목록에서 기록을 체크하고 선택 내보내기를 누르면 Word나 PDF로 받을 수 있어요.'
               )
             ) : (
               <>

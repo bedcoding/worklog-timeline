@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   fromDay,
+  groupLabel,
+  groupStartOf,
   isValidISO,
+  listUnitFor,
   mondayOf,
   monthOptions,
   periodFor,
@@ -56,6 +59,21 @@ describe('dates', () => {
     expect(fromDay(r.end)).toBe('2026-12-31');
     expect(periodLabel(period, r)).toBe('2026년');
     expect(shiftPeriod(period, 1)).toMatchObject({ view: 'year', year: 2027 });
+  });
+
+  it('기록 목록은 분기별과 연도별 보기에서 달마다, 그 밖에는 주마다 묶는다', () => {
+    expect(listUnitFor('recent')).toBe('week');
+    expect(listUnitFor('month')).toBe('week');
+    expect(listUnitFor('quarter')).toBe('month');
+    expect(listUnitFor('year')).toBe('month');
+  });
+
+  it('묶음의 첫날과 이름은 주는 월요일부터, 달은 1일부터', () => {
+    const day = toDay('2026-10-04');
+    expect(fromDay(groupStartOf(day, 'week'))).toBe('2026-09-28');
+    expect(groupLabel(groupStartOf(day, 'week'), 'week')).toBe('9/28 ~ 10/4');
+    expect(fromDay(groupStartOf(day, 'month'))).toBe('2026-10-01');
+    expect(groupLabel(groupStartOf(day, 'month'), 'month')).toBe('10월');
   });
 
   it('연도 목록은 작년, 올해, 내년과 기록이 있는 해를 최근 해부터 보여 준다', () => {

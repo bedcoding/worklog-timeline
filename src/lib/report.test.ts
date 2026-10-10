@@ -85,6 +85,21 @@ describe('buildReport', () => {
     expect(text).toContain('한계  사용 한도 도달 1회(8/12)');
   });
 
+  it('효과는 큰 작업을 최근 것부터 적고 기타로 묶은 기록은 그 뒤에 적는다', () => {
+    const text = cell(
+      buildReport(
+        [
+          rec('2026-07-10', { type: 'dev', title: '큰 작업 1', effect: '효과 1' }),
+          rec('2026-09-30', { type: 'etc', title: '9월 기타', effect: '기타 효과' }),
+          rec('2026-08-20', { type: 'dev', title: '큰 작업 2', effect: '효과 2' }),
+        ],
+        settings,
+      ),
+      'effects',
+    );
+    expect(text.split('\n').slice(0, 3)).toEqual(['큰 작업 2  효과 2', '큰 작업 1  효과 1', '9월 기타  기타 효과']);
+  });
+
   it('부서장 의견은 도구별 빈칸만 만든다', () => {
     const opinion = report.rows.find((r) => r.key === 'opinion')!;
     expect(opinion.lines.map((l) => l.head)).toEqual(['Claude Team Premium Premium', '이미지 도구 Pro']);

@@ -1,5 +1,5 @@
 import { fromDay, toDay } from './dates';
-import type { WorkRecord } from './types';
+import type { ViewKind, WorkRecord } from './types';
 
 /**
  * 예시 기록의 날짜를 가장 최근 예시가 오늘이 되게 옮깁니다.
@@ -9,6 +9,14 @@ export function shiftSampleDates(records: readonly WorkRecord[], today: string):
   if (!records.length) return [];
   const shift = toDay(today) - Math.max(...records.map((r) => toDay(r.date)));
   return records.map((r) => ({ ...r, date: fromDay(toDay(r.date) + shift) }));
+}
+
+/**
+ * 보기를 고른 적이 없는 브라우저에서 처음 여는 보기. 보고서를 분기마다 내서 분기별로 엽니다.
+ * 예시 기록만 있으면 최근 30일로 엽니다. 예시는 가장 최근 것이 오늘이 되게 옮겨 두어서, 분기 초에는 분기별 보기에 몇 개만 들어오기 때문입니다.
+ */
+export function defaultView(records: readonly WorkRecord[]): ViewKind {
+  return records.length > 0 && records.every((r) => r.sample) ? 'recent' : 'quarter';
 }
 
 export type PortalView = 'sample' | 'mine';

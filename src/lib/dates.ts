@@ -126,6 +126,24 @@ export function shiftPeriod(period: Period, delta: number): Period {
   return period;
 }
 
+/** 아래 기록 목록을 묶는 단위. 분기별과 연도별 보기는 기록이 석 달 넘게 펼쳐져서 달마다, 그 밖에는 주마다 묶습니다. */
+export type ListUnit = 'week' | 'month';
+
+export const listUnitFor = (view: ViewKind): ListUnit => (view === 'quarter' || view === 'year' ? 'month' : 'week');
+
+/** 그 날이 든 묶음의 첫날. 주는 월요일, 달은 1일입니다. */
+export function groupStartOf(day: number, unit: ListUnit): number {
+  if (unit === 'week') return mondayOf(day);
+  const iso = fromDay(day);
+  return monthStartDay(yearOf(iso), monthOf(iso));
+}
+
+/** 묶음 이름. 주는 9/28 ~ 10/4, 달은 9월 */
+export function groupLabel(start: number, unit: ListUnit): string {
+  if (unit === 'month') return `${monthOf(fromDay(start))}월`;
+  return `${shortDate(fromDay(start))} ~ ${shortDate(fromDay(start + 6))}`;
+}
+
 /** 2026.07.01 ~ 2026.09.30 */
 export function rangeCaption(range: DayRange): string {
   return `${fromDay(range.start).replaceAll('-', '.')} ~ ${fromDay(range.end).replaceAll('-', '.')}`;
